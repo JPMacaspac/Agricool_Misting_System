@@ -1,0 +1,38 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #1c2b3a;
+  color: white;
+  margin: 0;
+  padding: 0;
+}
+
+/* Dashboard Layout */
+.dashboard {
+  padding: 20px;
+}
+
+/* Sensor Cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.card {
+  background: #2e3b4e;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+/* Alert Banner */
+.alert {
+  margin-top: 20px;
+  padding: 15px;
+  background: red;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  border-radius: 10px;
+}
+
