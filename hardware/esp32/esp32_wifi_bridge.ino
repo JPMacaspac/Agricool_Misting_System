@@ -22,7 +22,7 @@ const char* ssid = "PLDTHOMEFIBR348b8";           // Replace with your WiFi name
 const char* password = "PLDTWIFI5bek7";   // Replace with your WiFi password
 
 // ============ Backend API Configuration ============
-const char* serverUrl = "http://192.168.1.16:3000/api/sensors";
+const char* serverUrl = "http://192.168.1.16:8081/api/sensors";
 // Example: "http://192.168.1.100:3000/api/sensors"
 // Or if using cloud: "https://your-app.herokuapp.com/api/sensors"
 

@@ -16,17 +16,50 @@ export default function Dashboard() {
   const userName = localStorage.getItem("userName") || "Jp Macaspac";
 
   useEffect(() => {
+    // fetch initial data once; realtime SSE will update after this
     const fetchData = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/api/sensors/latest");
+        const API_BASE = process.env.REACT_APP_API_URL || "http://192.168.1.16:8081";
+        const res = await axios.get(`${API_BASE}/api/sensors/latest`);
         setSensorData(res.data);
       } catch (err) {
         setSensorData(null);
       }
     };
     fetchData();
-    const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
+    // no polling — realtime updates via SSE subscribe in separate effect
+    return () => {};
+  }, []);
+
+  // SSE realtime subscription (updates sensorData immediately)
+  useEffect(() => {
+    const API_BASE = process.env.REACT_APP_API_URL || "http://192.168.1.16:8081";
+    const streamUrl = `${API_BASE}/api/sensors/stream`;
+    let es;
+    try {
+      es = new EventSource(streamUrl);
+    } catch (err) {
+      console.warn('EventSource failed to start', err);
+      return;
+    }
+
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        setSensorData(data);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    es.onerror = (ev) => {
+      // close and let the browser attempt reconnect according to policy
+      try { es.close(); } catch (e) {}
+    };
+
+    return () => {
+      try { es && es.close(); } catch (e) {}
+    };
   }, []);
 
   // Always render dashboard layout

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sensor } from './sensors.entity';
+import sseEmitter from '../sse';
 
 
 @Injectable()
@@ -11,9 +12,16 @@ export class SensorsService {
     private sensorsRepository: Repository<Sensor>,
   ) {}
 
-  create(data: Partial<Sensor>) {
+  async create(data: Partial<Sensor>) {
     const newData = this.sensorsRepository.create(data);
-    return this.sensorsRepository.save(newData);
+    const saved = await this.sensorsRepository.save(newData);
+    // emit to SSE listeners (best-effort)
+    try {
+      sseEmitter.emit('data', saved);
+    } catch (e) {
+      // ignore
+    }
+    return saved;
   }
 
   findAll() {
@@ -22,9 +30,12 @@ export class SensorsService {
     });
   }
 
-  findLatest() {
-    return this.sensorsRepository.findOne({
+  async findLatest() {
+    // Use find with take:1 to avoid TypeORM findOne requirement for selection
+    const items = await this.sensorsRepository.find({
       order: { createdAt: 'DESC' },
+      take: 1,
     });
+    return items.length > 0 ? items[0] : null;
   }
 }

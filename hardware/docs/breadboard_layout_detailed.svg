@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+  <style>
+    .bg { fill: #f8f8f8; }
+    .bb { fill: #ffffff; stroke: #cfcfcf; stroke-width: 2 } 
+    .hole { fill: #222; opacity: 0.15 }
+    .rail { fill: none; stroke: #e0e0e0; stroke-width: 2 }
+    .label { font: 14px sans-serif; }
+    .small { font: 12px sans-serif; }
+    .wire { stroke-width: 6; stroke-linecap: round }
+    .res-body { stroke: #8b4513; stroke-width: 8; stroke-linecap: round }
+    .res-band { stroke-width: 6; stroke-linecap: round }
+    .pin { fill: #111 }
+    .note { font: 12px sans-serif; fill: #222 }
+    .hole-outline { stroke: #ddd; stroke-width: 1 }
+    .rownum { font: 10px monospace; fill: #666 }
+  </style>
+
+  <rect x="0" y="0" width="1200" height="520" class="bg" />
+
+  <text x="24" y="28" class="label">Breadboard wiring: Mega TX1 → 10k (R1) → OUT → 10k+10k (R2) → GND</text>
+
+  <!-- Breadboard rectangle -->
+  <rect x="20" y="40" width="820" height="320" rx="8" class="bb" />
+
+  <!-- power rails on left and right -->
+  <rect x="10" y="60" width="12" height="280" fill="#f1f1f1" stroke="#ddd" />
+  <rect x="840" y="60" width="12" height="280" fill="#f1f1f1" stroke="#ddd" />
+  <text x="8" y="56" class="small">Power rails</text>
+
+  <!-- holes grid: create two blocks of 5-hole rows with center gap -->
+  <!-- Left block columns (A-E) -->
+  <g id="left-block" transform="translate(40,80)">
+    <!-- rows 1..30 -->
+    <g id="holes-left">
+      <!-- draw holes in 5 columns x 30 rows -->
+      <!-- Each hole spacing 18px -->
+      <!-- We'll also label rows for clarity -->
+      <g>
+        <!-- columns -->
+        <!-- using JS-like generation is not possible; manually loop using copy -->
+      </g>
+    </g>
+  </g>
+
+  <!-- We'll generate holes programmatically by pasting rows -->
+</svg>

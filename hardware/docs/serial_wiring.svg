@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+  <style>
+    .title { font: bold 18px sans-serif; }
+    .label { font: 12px sans-serif; }
+    .pin { font: 11px monospace; fill: #000; }
+    .box { fill: #f5f5f5; stroke: #333; stroke-width: 2px; }
+    .wire { stroke-width: 3; stroke-linecap: round; }
+    .gnd { stroke: #000; stroke-width: 2; stroke-dasharray: 4 2; }
+    .res { stroke: #c66; stroke-width: 6; stroke-linecap: round; }
+    .rtext { font: 12px sans-serif; fill: #c33; }
+  </style>
+
+  <!-- Title -->
+  <text x="20" y="28" class="title">Arduino Mega ↔ ESP32 Serial Wiring (with resistor divider)</text>
+
+  <!-- Mega box -->
+  <rect x="20" y="50" width="240" height="260" rx="8" class="box"/>
+  <text x="30" y="78" class="label">Arduino Mega (Serial1)</text>
+  <text x="34" y="110" class="pin">TX1 (pin 18)</text>
+  <circle cx="120" cy="106" r="6" fill="#2e7" stroke="#000"/>
+  <text x="34" y="140" class="pin">RX1 (pin 19)</text>
+  <circle cx="120" cy="136" r="6" fill="#fc8" stroke="#000"/>
+  <text x="34" y="170" class="pin">GND</text>
+  <circle cx="120" cy="166" r="6" fill="#888" stroke="#000"/>
+
+  <!-- Breadboard / resistor divider -->
+  <rect x="290" y="80" width="170" height="160" rx="6" fill="#fff" stroke="#666"/>
+  <text x="300" y="100" class="label">Breadboard: resistor divider</text>
+  <!-- R1 and R2 representation -->
+  <line x1="350" y1="165" x2="420" y2="165" class="res"/>
+  <text x="360" y="150" class="rtext">R1 = 10kΩ</text>
+  <line x1="420" y1="165" x2="520" y2="165" class="res"/>
+  <text x="430" y="180" class="rtext">R2 = 20kΩ</text>
+  <!-- OUT node -->
+  <circle cx="420" cy="165" r="6" fill="#39f" stroke="#000"/>
+  <text x="430" y="160" class="label">OUT ≈ 3.3V</text>
+
+  <!-- ESP32 box -->
+  <rect x="620" y="50" width="240" height="260" rx="8" class="box"/>
+  <text x="630" y="78" class="label">ESP32 (Serial2)</text>
+  <text x="634" y="110" class="pin">RX2 (GPIO16)</text>
+  <circle cx="740" cy="106" r="6" fill="#39f" stroke="#000"/>
+  <text x="634" y="140" class="pin">TX2 (GPIO17)</text>
+  <circle cx="740" cy="136" r="6" fill="#fc8" stroke="#000"/>
+  <text x="634" y="170" class="pin">GND</text>
+  <circle cx="740" cy="166" r="6" fill="#888" stroke="#000"/>
+
+  <!-- Wires -->
+  <!-- Mega TX1 -> R1 -->
+  <line x1="126" y1="106" x2="350" y2="165" stroke="#0b0" class="wire"/>
+  <text x="180" y="126" class="label">Mega TX1 (pin 18)</text>
+
+  <!-- OUT -> ESP32 RX2 -->
+  <line x1="426" y1="165" x2="734" y2="106" stroke="#06f" class="wire"/>
+  <text x="520" y="120" class="label">OUT → ESP32 RX (GPIO16)</text>
+
+  <!-- ESP32 TX2 -> Mega RX1 (direct) -->
+  <line x1="740" y1="136" x2="126" y2="136" stroke="#f90" class="wire"/>
+  <text x="360" y="150" class="label">ESP32 TX → Mega RX1 (pin 19)</text>
+
+  <!-- Ground connections -->
+  <line x1="126" y1="166" x2="740" y2="166" stroke="#000" class="gnd"/>
+  <text x="360" y="182" class="label">Common GND (Mega &amp; ESP32 &amp; R2 bottom)</text>
+
+  <!-- Notes box -->
+  <rect x="20" y="330" width="840" height="70" rx="6" fill="#fffbea" stroke="#b58"/>
+  <text x="34" y="352" class="label">Notes:</text>
+  <text x="34" y="372" class="label">• R1 = 10kΩ between Mega TX and OUT. R2 = 20kΩ between OUT and GND. OUT ≈ 3.3V when Mega TX HIGH.</text>
+  <text x="34" y="392" class="label">• Ensure both boards share the same ground. Use Serial1 on Mega (TX1 pin 18 / RX1 pin 19) and Serial2 on ESP32 (RX=16, TX=17). Both sides must use same baud (9600).</text>
+</svg>

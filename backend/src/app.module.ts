@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { User } from './users/user.entity';
+import { SensorsModule } from './sensors/sensors.module';
+import { Sensor } from './sensors/sensors.entity';
 
 @Module({
   imports: [
@@ -12,10 +14,11 @@ import { User } from './users/user.entity';
       username: 'root',
       password: '', // your MySQL password if any
       database: 'agricooldb', // your database name
-      entities: [User],
+      entities: [User, Sensor],
       synchronize: true, // automatically creates the table if not exists
     }),
     UsersModule,
+    SensorsModule,
   ],
 })
 export class AppModule {}
