@@ -4,6 +4,7 @@ import { UsersModule } from './users/users.module';
 import { User } from './users/user.entity';
 import { SensorsModule } from './sensors/sensors.module';
 import { Sensor } from './sensors/sensors.entity';
+import { MistingLog } from './sensors/misting-log.entity';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { Sensor } from './sensors/sensors.entity';
       username: 'root',
       password: '', // your MySQL password if any
       database: 'agricooldb', // your database name
-      entities: [User, Sensor],
+      entities: [User, Sensor, MistingLog],
       synchronize: true, // automatically creates the table if not exists
     }),
     UsersModule,

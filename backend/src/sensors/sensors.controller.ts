@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Req, Res } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { SensorsService } from './sensors.service';
 
@@ -7,6 +7,20 @@ interface SensorDataDto {
   humidity: number;
   waterLevel: number;
   pumpStatus: boolean;
+}
+
+interface MistingStartDto {
+  temperature: number;
+  humidity: number;
+  heatIndex: number;
+  waterLevel: number;
+}
+
+interface MistingEndDto {
+  temperature: number;
+  humidity: number;
+  heatIndex: number;
+  waterLevel: number;
 }
 
 @Controller('api/sensors')
@@ -27,6 +41,11 @@ export class SensorsController {
   @Get('latest')
   findLatest() {
     return this.sensorsService.findLatest();
+  }
+
+  @Get('logs')
+  findLogs() {
+    return this.sensorsService.findAll();
   }
 
   @Get('stream')
@@ -57,5 +76,28 @@ export class SensorsController {
     });
 
     return res;
+  }
+}
+
+// NEW CONTROLLER FOR MISTING LOGS
+@Controller('api/misting')
+export class MistingController {
+  constructor(private readonly sensorsService: SensorsService) {}
+
+  @Get('logs')
+  getMistingLogs() {
+    return this.sensorsService.getMistingLogs();
+  }
+
+  @Post('start')
+  startMistingLog(@Body() data: MistingStartDto) {
+    console.log('Misting started:', data);
+    return this.sensorsService.startMistingLog(data);
+  }
+
+  @Put('end/:logId')
+  endMistingLog(@Param('logId') logId: string, @Body() data: MistingEndDto) {
+    console.log('Misting ended:', logId, data);
+    return this.sensorsService.endMistingLog(parseInt(logId), data);
   }
 }

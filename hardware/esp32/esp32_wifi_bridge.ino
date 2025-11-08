@@ -1,183 +1,345 @@
 /*
- * AgriCool Misting System - ESP32 WiFi Bridge
- * 
- * This code runs on ESP32 to:
- * 1. Receive sensor data from Arduino Mega via Serial
- * 2. Send data to your backend API via WiFi
- * 3. Receive commands from web app (future feature)
- * 
+ * AgriCool ESP32 WiFi Bridge with mDNS support
+ * - Uses mDNS to find backend server automatically (no IP needed!)
+ * - AP configuration portal for easy WiFi setup
+ * - Works on ANY router without reconfiguration
+ *
  * Wiring:
- * Arduino Mega TX1 (Pin 18) → ESP32 RX (Pin 16 or RX2)
- * Arduino Mega RX1 (Pin 19) → ESP32 TX (Pin 17 or TX2)
- * Arduino Mega GND → ESP32 GND (IMPORTANT!)
- * 
- * Each board should have its own power supply
+ * - Serial2 RX=16, TX=17 (ESP32) <--> Arduino Mega TX1(18), RX1(19)
+ * - Common GND required
+ *
+ * mDNS Setup:
+ * - Backend server advertises as "agricool-server.local"
+ * - ESP32 automatically finds it on any network
  */
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WebServer.h>
+#include <Preferences.h>
+#include <ESPmDNS.h>
 
-// ============ WiFi Configuration ============
-const char* ssid = "PLDTHOMEFIBR348b8";           // Replace with your WiFi name
-const char* password = "PLDTWIFI5bek7";   // Replace with your WiFi password
-
-// ============ Backend API Configuration ============
-const char* serverUrl = "http://192.168.1.16:8081/api/sensors";
-// Example: "http://192.168.1.100:3000/api/sensors"
-// Or if using cloud: "https://your-app.herokuapp.com/api/sensors"
-
-// ============ Serial Communication ============
-// ESP32 Serial2 pins: RX=16, TX=17 (default)
+// Serial2 pins
 #define RXD2 16
 #define TXD2 17
 
-// ============ Data Variables ============
+// Defaults
+const char* DEFAULT_SSID = "ZTE_2.4G_u33E3a";
+const char* DEFAULT_PASS = "kCqbH4ER";
+const char* DEFAULT_SERVER = "http://agricool-server.local:8081/api/sensors"; // mDNS hostname
+
+// Preferences
+Preferences prefs;
+const char* PREF_NAMESPACE = "agricool";
+const char* KEY_SSID = "ssid";
+const char* KEY_PASS = "pass";
+const char* KEY_SERVER = "server";
+
+WebServer webServer(80);
+
+String ssid;
+String pass;
+String serverUrl;
+
+// Data variables
 float temperature = 0.0;
 float humidity = 0.0;
 int waterLevel = 0;
 bool pumpStatus = false;
 
-// ============ Timing ============
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 5000;  // Send to server every 5 seconds
+const unsigned long sendInterval = 5000;
+
+// Forward declarations
+void startConfigPortal();
+void handleRoot();
+void handleSave();
+void startWiFi(const char* s, const char* p);
+bool tryStoredWiFi();
+String resolveServerUrl(String url);
 
 void setup() {
-  // Initialize Serial for debugging
-  Serial.begin(9600);
-  
-  // Initialize Serial2 for Arduino Mega communication
+  Serial.begin(115200);
+  delay(100);
+  Serial.println("\n\n=== AgriCool ESP32 WiFi Bridge (mDNS Enabled) ===");
+
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
-  
-  Serial.println("\n=== AgriCool ESP32 WiFi Bridge ===");
-  
-  // Connect to WiFi
-  connectToWiFi();
+  Serial.println("Serial2 initialized (RX=16, TX=17)");
+
+  // Load config
+  prefs.begin(PREF_NAMESPACE, false);
+  ssid = prefs.getString(KEY_SSID, DEFAULT_SSID);
+  pass = prefs.getString(KEY_PASS, DEFAULT_PASS);
+  serverUrl = prefs.getString(KEY_SERVER, DEFAULT_SERVER);
+  prefs.end();
+
+  Serial.println("Stored config:");
+  Serial.print("  SSID: "); Serial.println(ssid);
+  Serial.print("  Server: "); Serial.println(serverUrl);
+
+  // Try WiFi connection
+  if (!tryStoredWiFi()) {
+    Serial.println("Failed to connect to WiFi -> Starting config portal");
+    startConfigPortal();
+  } else {
+    Serial.println("WiFi connected!");
+    Serial.print("Local IP: ");
+    Serial.println(WiFi.localIP());
+    
+    // Start mDNS
+    if (MDNS.begin("agricool-esp32")) {
+      Serial.println("mDNS responder started: agricool-esp32.local");
+    }
+  }
 }
 
 void loop() {
-  // Check WiFi connection
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi disconnected! Reconnecting...");
-    connectToWiFi();
+  // Handle AP mode
+  if (WiFi.getMode() == WIFI_AP) {
+    webServer.handleClient();
+    return;
   }
-  
-  // Read data from Arduino Mega
+
+  // Reconnect if disconnected
+  if (WiFi.status() != WL_CONNECTED) {
+    static unsigned long lastAttempt = 0;
+    unsigned long now = millis();
+    if (now - lastAttempt > 10000) {
+      Serial.println("WiFi lost, reconnecting...");
+      lastAttempt = now;
+      prefs.begin(PREF_NAMESPACE, false);
+      ssid = prefs.getString(KEY_SSID, DEFAULT_SSID);
+      pass = prefs.getString(KEY_PASS, DEFAULT_PASS);
+      prefs.end();
+      startWiFi(ssid.c_str(), pass.c_str());
+    }
+    delay(10);
+    return;
+  }
+
+  // Read from Arduino
   if (Serial2.available()) {
     String data = Serial2.readStringUntil('\n');
     data.trim();
-    
-    Serial.print("Received from Arduino: ");
-    Serial.println(data);
-    
-    // Parse comma-separated values: TEMP,HUMIDITY,WATER_LEVEL,PUMP_STATUS
-    if (parseData(data)) {
-      Serial.printf("Parsed - Temp: %.2f°C, Humidity: %.2f%%, Water: %d%%, Pump: %s\n",
-                    temperature, humidity, waterLevel, pumpStatus ? "ON" : "OFF");
+    if (data.length() > 0) {
+      Serial.print("Received: ");
+      Serial.println(data);
+      
+      int first = data.indexOf(',');
+      int second = data.indexOf(',', first + 1);
+      int third = data.indexOf(',', second + 1);
+      
+      if (first != -1 && second != -1 && third != -1) {
+        temperature = data.substring(0, first).toFloat();
+        humidity = data.substring(first + 1, second).toFloat();
+        waterLevel = data.substring(second + 1, third).toInt();
+        pumpStatus = data.substring(third + 1).toInt() == 1;
+        
+        Serial.printf("Parsed: T=%.1f H=%.1f WL=%d Pump=%s\n", 
+          temperature, humidity, waterLevel, pumpStatus ? "ON" : "OFF");
+      }
     }
   }
-  
-  // Send data to backend server periodically
-  unsigned long currentTime = millis();
-  if (currentTime - lastSendTime >= sendInterval) {
-    sendDataToServer();
-    lastSendTime = currentTime;
+
+  // Send to backend
+  unsigned long now = millis();
+  if (now - lastSendTime >= sendInterval) {
+    lastSendTime = now;
+    
+    String jsonPayload = "{";
+    jsonPayload += "\"temperature\":" + String(temperature, 2) + ",";
+    jsonPayload += "\"humidity\":" + String(humidity, 2) + ",";
+    jsonPayload += "\"waterLevel\":" + String(waterLevel) + ",";
+    jsonPayload += "\"pumpStatus\":" + String(pumpStatus ? "true" : "false");
+    jsonPayload += "}";
+    
+    // Resolve mDNS hostname to IP if needed
+    String resolvedUrl = resolveServerUrl(serverUrl);
+    
+    Serial.println("Sending to: " + resolvedUrl);
+    
+    HTTPClient http;
+    http.setTimeout(5000);
+    http.begin(resolvedUrl);
+    http.addHeader("Content-Type", "application/json");
+    
+    int httpResponseCode = http.POST(jsonPayload);
+    
+    if (httpResponseCode > 0) {
+      Serial.printf("✓ Success (%d)\n", httpResponseCode);
+    } else {
+      Serial.printf("✗ Error (%d): %s\n", httpResponseCode, 
+        http.errorToString(httpResponseCode).c_str());
+    }
+    http.end();
   }
-  
-  delay(100);  // Small delay to prevent overwhelming the CPU
+
+  delay(10);
 }
 
-// ============ WiFi Connection ============
-void connectToWiFi() {
-  Serial.print("Connecting to WiFi: ");
-  Serial.println(ssid);
+// Resolve mDNS hostname to IP address
+String resolveServerUrl(String url) {
+  // Check if URL contains .local
+  if (url.indexOf(".local") == -1) {
+    return url; // Already an IP, return as-is
+  }
   
-  WiFi.begin(ssid, password);
+  // Extract hostname (e.g., "agricool-server" from "http://agricool-server.local:8081/...")
+  int startIdx = url.indexOf("://") + 3;
+  int endIdx = url.indexOf(".local");
+  if (startIdx == -1 || endIdx == -1) {
+    return url;
+  }
   
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+  String hostname = url.substring(startIdx, endIdx);
+  Serial.print("Resolving mDNS: ");
+  Serial.println(hostname);
+  
+  IPAddress serverIP = MDNS.queryHost(hostname);
+  
+  if (serverIP.toString() == "0.0.0.0") {
+    Serial.println("⚠ mDNS resolution failed, using URL as-is");
+    return url;
+  }
+  
+  Serial.print("✓ Resolved to: ");
+  Serial.println(serverIP.toString());
+  
+  // Replace hostname with IP
+  String resolvedUrl = url;
+  resolvedUrl.replace(hostname + ".local", serverIP.toString());
+  
+  return resolvedUrl;
+}
+
+bool tryStoredWiFi() {
+  startWiFi(ssid.c_str(), pass.c_str());
+  Serial.println("Connecting (15s timeout)...");
+  unsigned long start = millis();
+  while (millis() - start < 15000) {
+    if (WiFi.status() == WL_CONNECTED) {
+      return true;
+    }
     delay(500);
     Serial.print(".");
-    attempts++;
   }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✓ WiFi Connected!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n✗ WiFi Connection Failed!");
-  }
+  Serial.println();
+  return WiFi.status() == WL_CONNECTED;
 }
 
-// ============ Parse Data from Arduino ============
-bool parseData(String data) {
-  int firstComma = data.indexOf(',');
-  int secondComma = data.indexOf(',', firstComma + 1);
-  int thirdComma = data.indexOf(',', secondComma + 1);
-  
-  if (firstComma == -1 || secondComma == -1 || thirdComma == -1) {
-    Serial.println("Error: Invalid data format");
-    return false;
-  }
-  
-  temperature = data.substring(0, firstComma).toFloat();
-  humidity = data.substring(firstComma + 1, secondComma).toFloat();
-  waterLevel = data.substring(secondComma + 1, thirdComma).toInt();
-  pumpStatus = data.substring(thirdComma + 1).toInt() == 1;
-  
-  return true;
+void startWiFi(const char* s, const char* p) {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.begin(s, p);
+  Serial.print("Connecting to: ");
+  Serial.println(s);
 }
 
-// ============ Send Data to Backend Server ============
-void sendDataToServer() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Cannot send data: WiFi not connected");
+void startConfigPortal() {
+  const char* apSSID = "AgriCool_Config";
+  const char* apPass = "agricool123";
+
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSSID, apPass);
+  IPAddress myIP = WiFi.softAPIP();
+  
+  Serial.println("\n======================================");
+  Serial.println("Config Portal Started!");
+  Serial.print("SSID: ");
+  Serial.println(apSSID);
+  Serial.print("Password: ");
+  Serial.println(apPass);
+  Serial.print("Config URL: http://");
+  Serial.println(myIP);
+  Serial.println("======================================\n");
+
+  webServer.on("/", HTTP_GET, handleRoot);
+  webServer.on("/save", HTTP_POST, handleSave);
+  webServer.onNotFound([]() {
+    webServer.send(404, "text/plain", "Not found");
+  });
+
+  webServer.begin();
+  Serial.println("Web server started");
+}
+
+void handleRoot() {
+  String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>AgriCool Setup</title>"
+                "<style>"
+                "body { font-family: Arial; background:#f2f2f2; padding:20px; max-width:500px; margin:0 auto; }"
+                "h2 { color:#2c3e50; }"
+                "label { font-weight:bold; color:#34495e; display:block; margin-top:12px; }"
+                "input { width:100%; padding:10px; margin:8px 0 16px 0; border:1px solid #bdc3c7; "
+                "border-radius:4px; box-sizing:border-box; font-size:14px; }"
+                "button { background:#27ae60; color:white; padding:12px 24px; border:none; "
+                "border-radius:4px; cursor:pointer; font-size:16px; width:100%; }"
+                "button:hover { background:#229954; }"
+                ".info { background:#ecf0f1; padding:12px; border-left:4px solid #3498db; margin-top:20px; font-size:13px; }"
+                ".tip { background:#fff3cd; padding:12px; border-left:4px solid #ffc107; margin-top:12px; font-size:13px; }"
+                "</style>"
+                "</head><body>"
+                "<h2>🌱 AgriCool WiFi Setup</h2>"
+                "<form method='POST' action='/save'>"
+                "<label>WiFi Network Name (SSID):</label>"
+                "<input name='ssid' value='" + ssid + "' required placeholder='e.g., ZTE_2.4G_u33E3a'/>"
+                "<label>WiFi Password:</label>"
+                "<input name='pass' value='" + pass + "' type='password' placeholder='Enter WiFi password'/>"
+                "<label>Backend Server URL:</label>"
+                "<input name='server' value='" + serverUrl + "' required placeholder='http://agricool-server.local:8081/api/sensors'/>"
+                "<button type='submit'>💾 Save & Connect</button>"
+                "</form>"
+                "<div class='tip'>"
+                "<strong>💡 Pro Tip:</strong> Use <code>agricool-server.local</code> instead of IP addresses. "
+                "Works on any router automatically!"
+                "</div>"
+                "<div class='info'>"
+                "<strong>ℹ️ Note:</strong> After saving, device will reboot and connect. "
+                "If connection fails, this portal will restart automatically."
+                "</div>"
+                "</body></html>";
+  webServer.send(200, "text/html", page);
+}
+
+void handleSave() {
+  if (webServer.method() != HTTP_POST) {
+    webServer.send(405, "text/plain", "Method Not Allowed");
     return;
   }
-  
-  HTTPClient http;
-  http.begin(serverUrl);
-  http.addHeader("Content-Type", "application/json");
-  
-  // Create JSON payload
-  String jsonPayload = "{";
-  jsonPayload += "\"temperature\":" + String(temperature, 2) + ",";
-  jsonPayload += "\"humidity\":" + String(humidity, 2) + ",";
-  jsonPayload += "\"waterLevel\":" + String(waterLevel) + ",";
-  jsonPayload += "\"pumpStatus\":" + String(pumpStatus ? "true" : "false");
-  jsonPayload += "}";
-  
-  Serial.println("Sending to server: " + jsonPayload);
-  
-  // Send POST request
-  int httpResponseCode = http.POST(jsonPayload);
-  
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    Serial.print("✓ Server response code: ");
-    Serial.println(httpResponseCode);
-    Serial.println("Response: " + response);
-  } else {
-    Serial.print("✗ Error sending data. Code: ");
-    Serial.println(httpResponseCode);
-    Serial.println("Error: " + http.errorToString(httpResponseCode));
-  }
-  
-  http.end();
-}
 
-// ============ Calculate Heat Index (Optional Enhancement) ============
-float calculateHeatIndex(float temp, float humidity) {
-  // Simplified heat index formula
-  float hi = 0.5 * (temp + 61.0 + ((temp - 68.0) * 1.2) + (humidity * 0.094));
-  
-  if (hi >= 80) {
-    // Use Rothfusz regression for more accurate results at higher temps
-    hi = -42.379 + 2.04901523 * temp + 10.14333127 * humidity
-         - 0.22475541 * temp * humidity - 0.00683783 * temp * temp
-         - 0.05481717 * humidity * humidity + 0.00122874 * temp * temp * humidity
-         + 0.00085282 * temp * humidity * humidity - 0.00000199 * temp * temp * humidity * humidity;
+  String newSsid = webServer.arg("ssid");
+  String newPass = webServer.arg("pass");
+  String newServer = webServer.arg("server");
+
+  if (newSsid.length() == 0 || newServer.length() == 0) {
+    webServer.send(400, "text/html", 
+      "<html><body><h3>❌ Error</h3><p>WiFi name and Server URL required</p>"
+      "<a href='/'>← Go Back</a></body></html>");
+    return;
   }
+
+  prefs.begin(PREF_NAMESPACE, false);
+  prefs.putString(KEY_SSID, newSsid);
+  prefs.putString(KEY_PASS, newPass);
+  prefs.putString(KEY_SERVER, newServer);
+  prefs.end();
+
+  Serial.println("✓ Configuration saved:");
+  Serial.println("  SSID: " + newSsid);
+  Serial.println("  Server: " + newServer);
+
+  String msg = "<html><head><meta http-equiv='refresh' content='10;url=/'/></head>"
+               "<body style='font-family:Arial;text-align:center;padding:50px;background:#f2f2f2;'>"
+               "<h2 style='color:#27ae60;'>✅ Saved Successfully!</h2>"
+               "<p>Device is rebooting and connecting to WiFi...</p>"
+               "<p style='color:#7f8c8d;'>If connection succeeds, this page won't reload.</p>"
+               "<p style='color:#7f8c8d;'>If it fails, reconnect to <strong>AgriCool_Config</strong>.</p>"
+               "</body></html>";
+  webServer.send(200, "text/html", msg);
   
-  return hi;
+  delay(2000);
+  Serial.println("Rebooting...");
+  ESP.restart();
 }

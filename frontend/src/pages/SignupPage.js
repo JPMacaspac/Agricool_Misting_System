@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import bg from '../bg.jpg';
@@ -8,6 +9,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
@@ -56,13 +58,22 @@ export default function SignupPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <input
-            type="password"
-            placeholder="Password"
-            className="block mb-6 p-3 w-full text-black rounded focus:outline-none"
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="relative mb-6">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              className="block p-3 w-full text-black rounded focus:outline-none"
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600"
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
 
           <button type="submit" className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded w-full font-bold">
             Sign Up
