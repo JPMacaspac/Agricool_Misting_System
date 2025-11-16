@@ -1,0 +1,173 @@
+import React, { useMemo } from 'react';
+import { Line, Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  LineElement,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(LineElement, BarElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
+
+export default function MistingCharts({ logs }) {
+  const chartData = useMemo(() => {
+    // Group logs by date
+    const groupedByDate = logs.reduce((acc, log) => {
+      const date = log.date;
+      if (!acc[date]) {
+        acc[date] = {
+          temps: [],
+          hums: [],
+          durations: [],
+          count: 0
+        };
+      }
+      if (log.temperature !== '--') acc[date].temps.push(parseFloat(log.temperature));
+      if (log.humidity !== '--') acc[date].hums.push(parseFloat(log.humidity));
+      if (log.duration !== '--' && log.duration !== 0) acc[date].durations.push(parseFloat(log.duration));
+      acc[date].count++;
+      return acc;
+    }, {});
+
+    // Get last 10 dates
+    const dates = Object.keys(groupedByDate).slice(-10);
+    
+    // Calculate averages
+    const avgTemps = dates.map(date => {
+      const temps = groupedByDate[date].temps;
+      return temps.length > 0 ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1) : 0;
+    });
+    
+    const avgHums = dates.map(date => {
+      const hums = groupedByDate[date].hums;
+      return hums.length > 0 ? (hums.reduce((a, b) => a + b, 0) / hums.length).toFixed(1) : 0;
+    });
+    
+    const totalDurations = dates.map(date => {
+      const durs = groupedByDate[date].durations;
+      return durs.length > 0 ? durs.reduce((a, b) => a + b, 0).toFixed(1) : 0;
+    });
+    
+    const eventCounts = dates.map(date => groupedByDate[date].count);
+
+    return { dates, avgTemps, avgHums, totalDurations, eventCounts };
+  }, [logs]);
+
+  // Temperature & Humidity Chart Data
+  const tempHumData = {
+    labels: chartData.dates,
+    datasets: [
+      {
+        label: 'Avg Temperature (°C)',
+        data: chartData.avgTemps,
+        borderColor: '#FF6B6B',
+        backgroundColor: 'rgba(255,107,107,0.2)',
+        tension: 0.3,
+        borderWidth: 2,
+        fill: false,
+      },
+      {
+        label: 'Avg Humidity (%)',
+        data: chartData.avgHums,
+        borderColor: '#4FC3F7',
+        backgroundColor: 'rgba(79,195,247,0.15)',
+        tension: 0.3,
+        borderWidth: 2,
+        fill: false,
+      },
+    ],
+  };
+
+  // Duration Chart Data
+  const durationData = {
+    labels: chartData.dates,
+    datasets: [
+      {
+        label: 'Total Duration (minutes)',
+        data: chartData.totalDurations,
+        backgroundColor: '#F6C85F',
+        borderColor: '#F6C85F',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  // Event Count Chart Data
+  const eventCountData = {
+    labels: chartData.dates,
+    datasets: [
+      {
+        label: 'Misting Events',
+        data: chartData.eventCounts,
+        backgroundColor: '#4FC3F7',
+        borderColor: '#4FC3F7',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { 
+        labels: { color: '#cbd5e1' },
+        position: 'top',
+      },
+      tooltip: { 
+        mode: 'index', 
+        intersect: false,
+      },
+    },
+    scales: {
+      x: { 
+        ticks: { color: '#9ca3af' }, 
+        grid: { color: '#374151' } 
+      },
+      y: { 
+        ticks: { color: '#9ca3af' }, 
+        grid: { color: '#374151' } 
+      },
+    },
+  };
+
+  if (chartData.dates.length === 0) {
+    return (
+      <div className="bg-[#2B3848] p-4 rounded-lg shadow-md mb-6">
+        <p className="text-center text-gray-400">No data available for charts</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      {/* Temperature & Humidity Chart */}
+      <div className="bg-[#2B3848] p-4 rounded-lg shadow-md">
+        <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">Temperature & Humidity Trends</h3>
+        <div className="h-48">
+          <Line data={tempHumData} options={chartOptions} />
+        </div>
+      </div>
+
+      {/* Duration Chart */}
+      <div className="bg-[#2B3848] p-4 rounded-lg shadow-md">
+        <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">Total Runtime per Day</h3>
+        <div className="h-48">
+          <Bar data={durationData} options={chartOptions} />
+        </div>
+      </div>
+
+      {/* Event Count Chart */}
+      <div className="bg-[#2B3848] p-4 rounded-lg shadow-md lg:col-span-2">
+        <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">Misting Events per Day</h3>
+        <div className="h-48">
+          <Bar data={eventCountData} options={chartOptions} />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -4,7 +4,10 @@ import { UsersModule } from './users/users.module';
 import { User } from './users/user.entity';
 import { SensorsModule } from './sensors/sensors.module';
 import { Sensor } from './sensors/sensors.entity';
-import { MistingLog } from './sensors/misting-log.entity';
+import { MistingModule } from './misting/misting.module';
+import { MistingLog } from './misting/misting-log.entity';
+import { NotificationModule } from './notifications/notification.module';
+import { Notification } from './notifications/notification.entity';
 
 @Module({
   imports: [
@@ -15,11 +18,13 @@ import { MistingLog } from './sensors/misting-log.entity';
       username: 'root',
       password: '', // your MySQL password if any
       database: 'agricooldb', // your database name
-      entities: [User, Sensor, MistingLog],
+      entities: [User, Sensor, MistingLog, Notification],
       synchronize: true, // automatically creates the table if not exists
     }),
     UsersModule,
     SensorsModule,
+    MistingModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}

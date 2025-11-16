@@ -9,8 +9,9 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
 
-ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend, annotationPlugin);
 
 function computeHeatIndexCelsius(tempC, humidity) {
   // Convert C to F
@@ -98,6 +99,29 @@ export default function RealtimeChart({ sensor }) {
     plugins: {
       legend: { labels: { color: '#cbd5e1' } },
       tooltip: { mode: 'index', intersect: false },
+      annotation: {
+        annotations: {
+          dangerLine: {
+            type: 'line',
+            yMin: 35,
+            yMax: 35,
+            borderColor: '#EF4444',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            label: {
+              display: true,
+              content: 'Danger Zone (35°C)',
+              position: 'end',
+              backgroundColor: '#EF4444',
+              color: '#fff',
+              font: {
+                weight: 'bold',
+                size: 11
+              }
+            }
+          }
+        }
+      }
     },
     scales: {
       x: { ticks: { color: '#9ca3af' } },

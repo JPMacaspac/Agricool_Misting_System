@@ -1,6 +1,6 @@
 /*
  * AgriCool Misting System - Arduino Mega
- * With LED indicators and buzzer for water level warnings
+ * With LED indicators, buzzer, and MANUAL CONTROL support
  */
 
 #include <DHT.h>
@@ -42,6 +42,7 @@ float humidity = 0.0;
 float distanceCM = 0.0;
 int waterPercent = 0;
 bool pumpStatus = false;
+bool manualMode = false;  // Manual override flag
 bool alertSent = false;
 unsigned long lastSMSTime = 0;
 unsigned long lastBuzzerTime = 0;
@@ -94,6 +95,7 @@ void setup() {
   Serial.println("  YELLOW (31-50%):  Pin 10");
   Serial.println("  RED    (0-30%):   Pin 4");
   Serial.println("  BUZZER (0-30%):   Pin 5");
+  Serial.println("Manual Control: ENABLED via Serial1");
   
   Serial2.println("AT");
   delay(1000);
@@ -105,6 +107,47 @@ void setup() {
 }
 
 void loop() {
+  // === NEW: Listen for manual commands from ESP32 ===
+  if (Serial1.available()) {
+    String command = Serial1.readStringUntil('\n');
+    command.trim();
+    
+    if (command == "MANUAL_ON") {
+      Serial.println("📱 Manual pump control: ON");
+      manualMode = true;
+      digitalWrite(PUMP_RELAY, HIGH);
+      pumpStatus = true;
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("MANUAL MODE");
+      lcd.setCursor(0, 1);
+      lcd.print("Pump: ON");
+      sendToNextion("t4.txt=\"Manual ON\"");
+      
+    } else if (command == "MANUAL_OFF") {
+      Serial.println("📱 Manual pump control: OFF");
+      manualMode = true;
+      digitalWrite(PUMP_RELAY, LOW);
+      pumpStatus = false;
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("MANUAL MODE");
+      lcd.setCursor(0, 1);
+      lcd.print("Pump: OFF");
+      sendToNextion("t4.txt=\"Manual OFF\"");
+      
+    } else if (command == "AUTO_MODE") {
+      Serial.println("🤖 Switched to AUTO mode");
+      manualMode = false;
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("AUTO MODE");
+      lcd.setCursor(0, 1);
+      lcd.print("Active");
+      sendToNextion("t4.txt=\"Auto Mode\"");
+    }
+  }
+
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
   distanceCM = readUltrasonicDistance();
@@ -137,75 +180,68 @@ void loop() {
   Serial.print("% | Water: "); Serial.print(waterPercent);
   Serial.print("% ("); Serial.print(distanceCM); Serial.print("cm)");
   Serial.print(" | Pump: "); Serial.print(pumpStatus ? "ON" : "OFF");
+  Serial.print(" | Mode: "); Serial.print(manualMode ? "MANUAL" : "AUTO");
   Serial.print(" | Pin: "); Serial.println(digitalRead(PUMP_RELAY) ? "HIGH" : "LOW");
-  
-  Serial.print("🔍 Threshold Check: Temp ");
-  Serial.print(temperature);
-  Serial.print(" >= ");
-  Serial.print(TEMP_THRESHOLD);
-  Serial.print("? ");
-  if (temperature >= TEMP_THRESHOLD) {
-    Serial.println("✅ YES - Pump should be ON");
-  } else {
-    Serial.print("❌ NO - Need ");
-    Serial.print(TEMP_THRESHOLD - temperature);
-    Serial.println("°C more");
-  }
 
+  // Send data to ESP32 (now includes manualMode)
   String data = String(temperature, 2) + "," +
                 String(humidity, 2) + "," +
                 String(waterPercent) + "," +
-                (pumpStatus ? "1" : "0");
+                (pumpStatus ? "1" : "0") + "," +
+                (manualMode ? "1" : "0");
   Serial1.println(data);
 
-  // === Misting Control Logic (TEMPERATURE ONLY) ===
-  if (temperature >= TEMP_THRESHOLD) {
-    if (!pumpStatus) {
-      digitalWrite(PUMP_RELAY, HIGH);
-      pumpStatus = true;
-      Serial.println("🔥 Pump ON (Pin HIGH)");
-      sendToNextion("t4.txt=\"Misting ON\"");
-    }
+  // === Misting Control Logic (ONLY if NOT in manual mode) ===
+  if (!manualMode) {
+    if (temperature >= TEMP_THRESHOLD) {
+      if (!pumpStatus) {
+        digitalWrite(PUMP_RELAY, HIGH);
+        pumpStatus = true;
+        Serial.println("🔥 AUTO: Pump ON (Pin HIGH)");
+        sendToNextion("t4.txt=\"Auto: Misting ON\"");
+      }
 
-    if (!alertSent && millis() - lastSMSTime > SMS_INTERVAL) {
-      String message = "AgriCool Alert - Temp:" + String(temperature, 1) +
-                       "C, Hum:" + String(humidity, 1) +
-                       "%, Water:" + String(waterPercent) +
-                       "%, Pump: ON";
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("SMS Sending...");
-      sendSMS(PHONE_NUMBER, message.c_str());
-      lcd.clear();
-      lcd.print("SMS Sent!");
-      lastSMSTime = millis();
-      alertSent = true;
-    }
+      if (!alertSent && millis() - lastSMSTime > SMS_INTERVAL) {
+        String message = "AgriCool Alert - Temp:" + String(temperature, 1) +
+                         "C, Hum:" + String(humidity, 1) +
+                         "%, Water:" + String(waterPercent) +
+                         "%, Pump: ON";
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("SMS Sending...");
+        sendSMS(PHONE_NUMBER, message.c_str());
+        lcd.clear();
+        lcd.print("SMS Sent!");
+        lastSMSTime = millis();
+        alertSent = true;
+      }
 
-  } else {
-    if (pumpStatus) {
-      digitalWrite(PUMP_RELAY, LOW);
-      pumpStatus = false;
-      Serial.println("❄️ Pump OFF (Pin LOW)");
-      sendToNextion("t4.txt=\"Misting OFF\"");
-    }
+    } else {
+      if (pumpStatus) {
+        digitalWrite(PUMP_RELAY, LOW);
+        pumpStatus = false;
+        Serial.println("❄️ AUTO: Pump OFF (Pin LOW)");
+        sendToNextion("t4.txt=\"Auto: Misting OFF\"");
+      }
 
-    if (alertSent && millis() - lastSMSTime > SMS_INTERVAL) {
-      String message = "AgriCool Update - Temp:" + String(temperature, 1) +
-                       "C, Hum:" + String(humidity, 1) +
-                       "%, Water:" + String(waterPercent) +
-                       "%, Pump: OFF";
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("SMS Sending...");
-      sendSMS(PHONE_NUMBER, message.c_str());
-      lcd.clear();
-      lcd.print("SMS Sent!");
-      lastSMSTime = millis();
-      alertSent = false;
+      if (alertSent && millis() - lastSMSTime > SMS_INTERVAL) {
+        String message = "AgriCool Update - Temp:" + String(temperature, 1) +
+                         "C, Hum:" + String(humidity, 1) +
+                         "%, Water:" + String(waterPercent) +
+                         "%, Pump: OFF";
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("SMS Sending...");
+        sendSMS(PHONE_NUMBER, message.c_str());
+        lcd.clear();
+        lcd.print("SMS Sent!");
+        lastSMSTime = millis();
+        alertSent = false;
+      }
     }
   }
 
+  // Update LCD
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("T:");
@@ -216,7 +252,8 @@ void loop() {
   lcd.setCursor(0, 1);
   lcd.print("W:");
   lcd.print(waterPercent);
-  lcd.print("% P:");
+  lcd.print("% ");
+  lcd.print(manualMode ? "M:" : "A:");
   lcd.print(pumpStatus ? "ON " : "OFF");
 
   updateNextion();
@@ -248,17 +285,14 @@ void updateWaterLevelIndicators(int level) {
   if (level >= 51) {
     // GREEN: Good water level (51-100%)
     digitalWrite(GREEN_LED, HIGH);
-    Serial.println("💚 GREEN - Water level good");
     
   } else if (level >= 31) {
     // YELLOW: Medium water level (31-50%)
     digitalWrite(YELLOW_LED, HIGH);
-    Serial.println("💛 YELLOW - Water level medium");
     
   } else {
     // RED: Low water level (0-30%)
     digitalWrite(RED_LED, HIGH);
-    Serial.println("🔴 RED - Water level LOW!");
     
     // Buzzer beeps intermittently (500ms on, 500ms off)
     if (millis() - lastBuzzerTime > 1000) {
@@ -315,4 +349,5 @@ void updateNextion() {
   sendToNextion("t1.txt=\"Hum: " + String(humidity, 1) + " %\"");
   sendToNextion("t2.txt=\"Water: " + String(waterPercent) + " %\"");
   sendToNextion("t3.txt=\"Pump: " + String(pumpStatus ? "ON" : "OFF") + "\"");
+  sendToNextion("t4.txt=\"Mode: " + String(manualMode ? "MANUAL" : "AUTO") + "\"");
 }

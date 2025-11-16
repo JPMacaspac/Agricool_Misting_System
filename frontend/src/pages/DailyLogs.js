@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar } from "react-icons/fa";
+import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar, FaBell } from "react-icons/fa";
+import NotificationPanel from '../components/NotificationPanel';
+import MistingCharts from '../components/MistingCharts';
 
 export function LogsTable({ logs }) {
     return (
@@ -10,6 +12,7 @@ export function LogsTable({ logs }) {
                     <tr className="text-gray-300 border-b border-gray-600">
                         <th className="py-3 px-4 font-semibold">Date</th>
                         <th className="py-3 px-4 font-semibold">Time</th>
+                        <th className="py-3 px-4 font-semibold">Type</th>
                         <th className="py-3 px-4 font-semibold">Temperature (°C)</th>
                         <th className="py-3 px-4 font-semibold">Humidity (%)</th>
                         <th className="py-3 px-4 font-semibold">Heat Index (°C)</th>
@@ -21,7 +24,7 @@ export function LogsTable({ logs }) {
                 <tbody>
                     {logs.length === 0 ? (
                         <tr>
-                            <td colSpan="8" className="py-4 px-4 text-center text-gray-400">
+                            <td colSpan="9" className="py-4 px-4 text-center text-gray-400">
                                 No misting events recorded yet
                             </td>
                         </tr>
@@ -33,13 +36,22 @@ export function LogsTable({ logs }) {
                             >
                                 <td className="py-3 px-4">{row.date}</td>
                                 <td className="py-3 px-4">{row.time}</td>
+                                <td className="py-3 px-4">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                        row.mistingType === 'MANUAL' 
+                                            ? 'bg-orange-600 text-white' 
+                                            : 'bg-green-600 text-white'
+                                    }`}>
+                                        {row.mistingType === 'MANUAL' ? 'MANUAL' : 'AUTO'}
+                                    </span>
+                                </td>
                                 <td className="py-3 px-4">{row.temperature}</td>
                                 <td className="py-3 px-4">{row.humidity}</td>
                                 <td className="py-3 px-4">{row.heatIndex}</td>
                                 <td className="py-3 px-4">{row.waterLevel}</td>
                                 <td className="py-3 px-4">{row.duration}</td>
-                                <td className={`py-3 px-4 font-medium ${row.status === 'Completed' ? 'text-green-400' : 'text-yellow-400'}`}>
-                                    {row.status}
+                                <td className="py-3 px-4 font-medium text-green-400">
+                                    Completed
                                 </td>
                             </tr>
                         ))
@@ -59,11 +71,35 @@ export default function DailyLogs() {
     const [error, setError] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [profilePicture, setProfilePicture] = useState(localStorage.getItem("profilePicture") || "");
     const rowsPerPage = 20;
 
     const API_BASE = process.env.REACT_APP_API_URL || "http://192.168.1.16:8081";
     const userName = localStorage.getItem("userName") || "Jp Macaspac";
     const navigate = useNavigate();
+
+    // ✅ NEW: Sync profile picture from localStorage
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setProfilePicture(localStorage.getItem("profilePicture") || "");
+        };
+
+        // Listen for storage changes
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Also check periodically in case changes happen in same tab
+        const interval = setInterval(() => {
+            const currentPic = localStorage.getItem("profilePicture") || "";
+            if (currentPic !== profilePicture) {
+                setProfilePicture(currentPic);
+            }
+        }, 500);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(interval);
+        };
+    }, [profilePicture]);
 
     // Fetch misting event logs from backend
     useEffect(() => {
@@ -72,7 +108,6 @@ export default function DailyLogs() {
                 setLoading(true);
                 setError(null);
                 
-                // Fetch misting event logs from your backend API
                 const response = await fetch(`${API_BASE}/api/misting/logs`);
                 
                 if (!response.ok) {
@@ -81,20 +116,14 @@ export default function DailyLogs() {
                 
                 const data = await response.json();
                 
-                // Transform the data to match the table format
                 const computeHeatIndexC = (tempC, rh) => {
                     if (tempC === undefined || tempC === null || rh === undefined || rh === null) return '--';
                     const T = parseFloat(tempC);
                     const R = parseFloat(rh);
                     if (Number.isNaN(T) || Number.isNaN(R)) return '--';
 
-                    // Convert Celsius to Fahrenheit
                     const Tf = (T * 9) / 5 + 32;
-
-                    // NOAA heat index formula (in Fahrenheit)
                     const HI = -42.379 + 2.04901523 * Tf + 10.14333127 * R - 0.22475541 * Tf * R - 6.83783e-3 * Tf * Tf - 5.481717e-2 * R * R + 1.22874e-3 * Tf * Tf * R + 8.5282e-4 * Tf * R * R - 1.99e-6 * Tf * Tf * R * R;
-
-                    // Convert back to Celsius
                     const HIc = ((HI - 32) * 5) / 9;
                     return HIc.toFixed(1);
                 };
@@ -103,8 +132,8 @@ export default function DailyLogs() {
                     const startDate = new Date(item.startTime);
                     const endDate = item.endTime ? new Date(item.endTime) : null;
                     const duration = endDate ? 
-                        Math.round((endDate - startDate) / 60000) : // Convert ms to minutes
-                        'In Progress';
+                        Math.round((endDate - startDate) / 60000) : 
+                        0; // ✅ Changed from 'In Progress' to 0
                     
                     const temp = item.startTemperature ? parseFloat(item.startTemperature) : null;
                     const hum = item.startHumidity ? parseFloat(item.startHumidity) : null;
@@ -121,17 +150,17 @@ export default function DailyLogs() {
                             minute: '2-digit',
                             second: '2-digit'
                         }),
+                        mistingType: item.mistingType || 'AUTO',
                         temperature: temp !== null ? temp.toFixed(1) : '--',
                         humidity: hum !== null ? hum.toFixed(1) : '--',
                         heatIndex: hi !== null ? hi.toFixed(1) : (temp !== null && hum !== null ? computeHeatIndexC(temp, hum) : '--'),
                         waterLevel: item.startWaterLevel ? parseFloat(item.startWaterLevel).toFixed(1) : '--',
-                        duration: typeof duration === 'number' ? duration : duration,
-                        status: item.endTime ? 'Completed' : 'In Progress',
+                        duration: duration, // ✅ Always a number now (0 if no endTime)
+                        status: 'Completed', // ✅ Always show as Completed
                         rawDate: startDate
                     };
                 });
 
-                // Sort by date descending (most recent first)
                 formattedLogs.sort((a, b) => b.rawDate - a.rawDate);
                 
                 setLogs(formattedLogs);
@@ -145,7 +174,6 @@ export default function DailyLogs() {
 
         fetchLogs();
 
-        // Set up polling to refresh logs every 30 seconds
         const interval = setInterval(fetchLogs, 30000);
         
         return () => clearInterval(interval);
@@ -159,6 +187,7 @@ export default function DailyLogs() {
                 const matchesQ =
                     r.date.toLowerCase().includes(q) ||
                     r.time.toLowerCase().includes(q) ||
+                    r.mistingType.toLowerCase().includes(q) ||
                     String(r.temperature).includes(q) ||
                     String(r.humidity).includes(q) ||
                     String(r.heatIndex).includes(q) ||
@@ -174,10 +203,8 @@ export default function DailyLogs() {
         });
     }, [logs, query, month, year]);
 
-    // Pagination calculations
     const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
     useEffect(() => {
-        // Reset to first page when filters change
         setCurrentPage(1);
     }, [filtered]);
 
@@ -187,48 +214,58 @@ export default function DailyLogs() {
     }, [filtered, currentPage]);
 
     return (
-        <div className="bg-gray-800 min-h-screen text-white font-sans flex flex-col">
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-40 flex justify-between items-center p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA]">
+        <div className="bg-gray-800 h-screen text-white font-sans flex flex-col overflow-hidden">
+            {/* Fixed Header */}
+            <header className="flex justify-between items-center p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-20">
                 <h1 className="text-xl font-bold">AgriCool</h1>
 
-                <div className="relative">
-                    <div
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => setMenuOpen(!menuOpen)}
-                    >
-                        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                            <span className="text-xs">{userName[0]}</span>
-                        </div>
-                        <span className="text-sm">{userName}</span>
-                    </div>
+                <div className="flex items-center gap-4">
+                    {/* ✅ NEW: Notification Panel */}
+                    <NotificationPanel apiBase={API_BASE} />
 
-                    {menuOpen && (
-                        <div className="absolute right-0 mt-2 w-32 bg-gray-800 rounded-md shadow-lg p-2 z-10">
-                            <button
-                                onClick={() => (window.location.href = "/profile")}
-                                className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded"
-                            >
-                                Profile
-                            </button>
-                            <button
-                                onClick={() => {
-                                    localStorage.clear();
-                                    window.location.href = "/";
-                                }}
-                                className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded text-red-400"
-                            >
-                                Logout
-                            </button>
+                    {/* User Menu */}
+                    <div className="relative">
+                        <div
+                            className="flex items-center gap-2 cursor-pointer"
+                            onClick={() => setMenuOpen(!menuOpen)}
+                        >
+                            <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
+                                {profilePicture ? (
+                                    <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="text-xs">{userName[0]}</span>
+                                )}
+                            </div>
+                            <span className="text-sm">{userName}</span>
                         </div>
-                    )}
+
+                        {menuOpen && (
+                            <div className="absolute right-0 mt-2 w-32 bg-gray-800 rounded-md shadow-lg p-2 z-10">
+                                <button
+                                    onClick={() => navigate('/profile')}
+                                    className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded"
+                                >
+                                    Profile
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        localStorage.clear();
+                                        window.location.href = "/";
+                                    }}
+                                    className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded text-red-400"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </header>
 
-                {/* Sidebar + Main Content */}
-            <div className="flex flex-1">
-                {/* Sidebar */}
-                <aside className="fixed left-0 top-16 bottom-0 bg-gray-900 w-20 flex flex-col items-center p-4 gap-6 border-r-2 border-[#A1F1FA]">
+            {/* Sidebar + Main Content */}
+            <div className="flex flex-1 overflow-hidden">
+                {/* Fixed Sidebar */}
+                <aside className="bg-gray-900 w-20 flex flex-col items-center p-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0">
                     <button
                         className="hover:text-[#A1F1FA] transition duration-200"
                         title="Dashboard"
@@ -258,107 +295,125 @@ export default function DailyLogs() {
                     <div className="w-6 h-6 bg-gray-600 rounded-md"></div>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 p-6 overflow-y-auto ml-20 pt-20">
-                    <h2 className="text-lg font-semibold mb-6 text-[#A1F1FA]">
-                        Misting Event Logs
-                    </h2>
+                {/* Scrollable Main Content */}
+                <main className="flex-1 overflow-y-auto custom-scrollbar">
+                    <style>{`
+                        .custom-scrollbar::-webkit-scrollbar {
+                            width: 8px;
+                        }
+                        .custom-scrollbar::-webkit-scrollbar-track {
+                            background: #1f2937;
+                        }
+                        .custom-scrollbar::-webkit-scrollbar-thumb {
+                            background: #4b5563;
+                            border-radius: 4px;
+                        }
+                        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                            background: #6b7280;
+                        }
+                    `}</style>
+                    
+                    <div className="p-6">
+                        <h2 className="text-lg font-semibold mb-6 text-[#A1F1FA]">
+                            Misting Event Logs
+                        </h2>
 
-                    {/* Search + Filters */}
-                    <div className="flex flex-wrap items-center gap-4 mb-6">
-                        <div className="flex items-center bg-[#2B3848] rounded-md px-3 py-2 w-full sm:w-1/3 shadow-sm">
-                            <input
-                                type="text"
-                                placeholder="Search"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="bg-transparent outline-none text-gray-200 w-full placeholder-gray-400"
-                            />
-                            <FaSearch size={18} className="text-gray-300" />
-                        </div>
-
-                        <select
-                            value={month}
-                            onChange={(e) => setMonth(e.target.value)}
-                            className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm"
-                        >
-                            <option>Month</option>
-                            <option>January</option>
-                            <option>February</option>
-                            <option>March</option>
-                            <option>April</option>
-                            <option>May</option>
-                            <option>June</option>
-                            <option>July</option>
-                            <option>August</option>
-                            <option>September</option>
-                            <option>October</option>
-                            <option>November</option>
-                            <option>December</option>
-                        </select>
-
-                        <select
-                            value={year}
-                            onChange={(e) => setYear(e.target.value)}
-                            className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm"
-                        >
-                            <option>Year</option>
-                            <option>2023</option>
-                            <option>2024</option>
-                            <option>2025</option>
-                        </select>
-
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="bg-[#A1F1FA] text-gray-900 px-4 py-2 rounded-md font-semibold hover:bg-[#8DE0EA] transition shadow-sm"
-                        >
-                            Refresh
-                        </button>
-                    </div>
-
-                    {loading && (
-                        <div className="text-center text-gray-400 py-8">
-                            Loading misting event logs...
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded-md mb-4">
-                            {error}
-                        </div>
-                    )}
-
-                    {!loading && !error && <LogsTable logs={paginated} />}
-
-                    {!loading && !error && (
-                        <div className="flex items-center justify-between mt-4">
-                            <p className="text-gray-400 text-sm">
-                                Showing {filtered.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filtered.length)} of {filtered.length} filtered ({logs.length} total)
-                            </p>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1}
-                                    className={`px-3 py-1 rounded-md font-semibold ${currentPage === 1 ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
-                                >
-                                    Prev
-                                </button>
-
-                                <div className="text-sm text-gray-300 px-2">
-                                    Page {currentPage} / {totalPages}
-                                </div>
-
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className={`px-3 py-1 rounded-md font-semibold ${currentPage === totalPages ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
-                                >
-                                    Next
-                                </button>
+                        {/* Search + Filters */}
+                        <div className="flex flex-wrap items-center gap-4 mb-6">
+                            <div className="flex items-center bg-[#2B3848] rounded-md px-3 py-2 w-full sm:w-1/3 shadow-sm">
+                                <input
+                                    type="text"
+                                    placeholder="Search (type, date, time, etc.)"
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    className="bg-transparent outline-none text-gray-200 w-full placeholder-gray-400"
+                                />
+                                <FaSearch size={18} className="text-gray-300" />
                             </div>
+
+                            <select
+                                value={month}
+                                onChange={(e) => setMonth(e.target.value)}
+                                className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm"
+                            >
+                                <option>Month</option>
+                                <option>January</option>
+                                <option>February</option>
+                                <option>March</option>
+                                <option>April</option>
+                                <option>May</option>
+                                <option>June</option>
+                                <option>July</option>
+                                <option>August</option>
+                                <option>September</option>
+                                <option>October</option>
+                                <option>November</option>
+                                <option>December</option>
+                            </select>
+
+                            <select
+                                value={year}
+                                onChange={(e) => setYear(e.target.value)}
+                                className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm"
+                            >
+                                <option>Year</option>
+                                <option>2023</option>
+                                <option>2024</option>
+                                <option>2025</option>
+                            </select>
+
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="bg-[#A1F1FA] text-gray-900 px-4 py-2 rounded-md font-semibold hover:bg-[#8DE0EA] transition shadow-sm"
+                            >
+                                Refresh
+                            </button>
                         </div>
-                    )}
+
+                        {loading && (
+                            <div className="text-center text-gray-400 py-8">
+                                Loading misting event logs...
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded-md mb-4">
+                                {error}
+                            </div>
+                        )}
+                        {!loading && !error && <MistingCharts logs={filtered} />}
+                        {!loading && !error && <LogsTable logs={paginated} />}
+
+                        {!loading && !error && (
+                            <div className="flex items-center justify-between mt-4">
+                                <p className="text-gray-400 text-sm">
+                                    Showing {filtered.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filtered.length)} of {filtered.length} filtered ({logs.length} total)
+                                </p>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className={`px-3 py-1 rounded-md font-semibold ${currentPage === 1 ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
+                                    >
+                                        Prev
+                                    </button>
+
+                                    <div className="text-sm text-gray-300 px-2">
+                                        Page {currentPage} / {totalPages}
+                                    </div>
+
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className={`px-3 py-1 rounded-md font-semibold ${currentPage === totalPages ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </main>
             </div>
         </div>

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sensor } from './sensors.entity';
-import { MistingLog } from './misting-log.entity';
+import { MistingLog } from '../misting/misting-log.entity';
 import sseEmitter from '../sse';
 
 interface MistingStartData {
@@ -10,6 +10,7 @@ interface MistingStartData {
   humidity: number;
   heatIndex: number;
   waterLevel: number;
+  mistingType?: string;
 }
 
 interface MistingEndData {
@@ -69,6 +70,7 @@ export class SensorsService {
       startHumidity: data.humidity,
       startHeatIndex: data.heatIndex,
       startWaterLevel: data.waterLevel,
+      mistingType: data.mistingType || 'AUTO',
     });
     const saved = await this.mistingLogRepository.save(newLog);
     return { success: true, logId: saved.id };
