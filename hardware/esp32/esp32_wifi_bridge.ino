@@ -1,7 +1,6 @@
 /*
  * AgriCool ESP32 WiFi Bridge with MQTT Control
- * Real-time manual pump control via MQTT
- * FIXED VERSION with better MQTT connection handling
+ * FIXED: Backend connection error handling
  */
 
 #include <WiFi.h>
@@ -11,15 +10,18 @@
 #include <ESPmDNS.h>
 #include <PubSubClient.h>
 
-#define RXD2 16
-#define TXD2 17
+#define RXD2 18
+#define TXD2 19
 
 const char* DEFAULT_SSID = "ZTE_2.4G_u33E3a";
 const char* DEFAULT_PASS = "kCqbH4ER";
 const char* DEFAULT_SERVER = "http://agricool-server.local:8081/api/sensors";
-const char* MQTT_SERVER = "192.168.1.2"; 
+const char* MQTT_SERVER = "agricool-mqtt";
 const int MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "agricool/pump/command";
+
+// Fallback IPs
+IPAddress fallback_server_ip(192, 168, 1, 2); // Your computer's IP
 IPAddress fallback_broker_ip(192, 168, 1, 2);
 
 Preferences prefs;
@@ -35,6 +37,7 @@ PubSubClient mqttClient(espClient);
 String ssid;
 String pass;
 String serverUrl;
+String resolvedServerUrl = ""; // Cache resolved URL
 
 float temperature = 0.0;
 float humidity = 0.0;
@@ -45,6 +48,8 @@ bool manualMode = false;
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000;
 unsigned long lastMqttReconnect = 0;
+unsigned long lastBackendSuccess = 0;
+bool backendReachable = false;
 
 void startConfigPortal();
 void handleRoot();
@@ -57,14 +62,15 @@ bool tryStoredWiFi();
 String resolveServerUrl(String url);
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void reconnectMQTT();
+bool sendToBackend(String jsonPayload);
 
 void setup() {
   Serial.begin(115200);
   delay(100);
-  Serial.println("\n\n=== AgriCool ESP32 with MQTT Control ===");
+  Serial.println("\n\n=== AgriCool ESP32 with MQTT Control (FIXED) ===");
 
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
-  Serial.println("Serial2 initialized (RX=16, TX=17)");
+  Serial.println("Serial2 initialized (RX=18, TX=19)");
 
   prefs.begin(PREF_NAMESPACE, false);
   ssid = prefs.getString(KEY_SSID, DEFAULT_SSID);
@@ -80,37 +86,61 @@ void setup() {
     Serial.println("Failed to connect to WiFi -> Starting config portal");
     startConfigPortal();
   } else {
-    Serial.println("WiFi connected!");
+    Serial.println("✅ WiFi connected!");
     Serial.print("Local IP: ");
     Serial.println(WiFi.localIP());
     
     if (MDNS.begin("agricool-esp32")) {
-      Serial.println("mDNS responder started: agricool-esp32.local");
+      Serial.println("✅ mDNS responder started: agricool-esp32.local");
     }
     
-    // Test mDNS resolution for MQTT broker
-    Serial.print("Resolving MQTT broker hostname: ");
-    Serial.println(MQTT_SERVER);
-    IPAddress mqttIP = MDNS.queryHost("agricool-mqtt");
-    Serial.print("Resolved MQTT broker to: ");
-    Serial.println(mqttIP);
-    if (mqttIP.toString() == "0.0.0.0") {
-      Serial.println("⚠️ WARNING: Could not resolve MQTT broker hostname!");
-      Serial.println("   Make sure your computer hostname is set to 'agricool-mqtt'");
-    }
+    // Resolve backend server URL
+    Serial.println("\n🔍 Resolving backend server...");
+    resolvedServerUrl = resolveServerUrl(serverUrl);
+    Serial.print("   Original URL: ");
+    Serial.println(serverUrl);
+    Serial.print("   Resolved URL: ");
+    Serial.println(resolvedServerUrl);
     
-    // Setup MQTT with improved settings
+    // Test backend connection
+    Serial.println("\n🧪 Testing backend connection...");
+    HTTPClient http;
+    http.setTimeout(5000);
+    http.begin(resolvedServerUrl);
+    http.addHeader("Content-Type", "application/json");
+    String testPayload = "{\"temperature\":0,\"humidity\":0,\"waterLevel\":0,\"pumpStatus\":false,\"manualMode\":false}";
+    int code = http.POST(testPayload);
+    if (code > 0) {
+      Serial.printf("✅ Backend reachable (HTTP %d)\n", code);
+      backendReachable = true;
+    } else {
+      Serial.printf("⚠️ Backend not reachable (Error %d: %s)\n", code, http.errorToString(code).c_str());
+      Serial.println("   Will retry with fallback IP...");
+      
+      // Try fallback IP
+      String fallbackUrl = "http://" + fallback_server_ip.toString() + ":8081/api/sensors";
+      http.begin(fallbackUrl);
+      http.addHeader("Content-Type", "application/json");
+      code = http.POST(testPayload);
+      if (code > 0) {
+        Serial.printf("✅ Fallback backend reachable (HTTP %d)\n", code);
+        resolvedServerUrl = fallbackUrl;
+        backendReachable = true;
+      } else {
+        Serial.println("❌ Fallback backend also failed");
+      }
+    }
+    http.end();
+    
+    // Setup MQTT
+    Serial.println("\n🔌 Setting up MQTT...");
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(mqttCallback);
     mqttClient.setKeepAlive(15);
     mqttClient.setSocketTimeout(15);
     Serial.println("✅ MQTT client configured");
-    Serial.print("   Broker: ");
-    Serial.print(MQTT_SERVER);
-    Serial.print(":");
-    Serial.println(MQTT_PORT);
     
-    // Setup manual control web server
+    // Setup web server
     webServer.on("/", HTTP_GET, handleRoot);
     webServer.on("/manual/on", HTTP_POST, handleManualOn);
     webServer.on("/manual/off", HTTP_POST, handleManualOff);
@@ -120,9 +150,11 @@ void setup() {
       startConfigPortal();
     });
     webServer.begin();
-    Serial.println("✅ Manual control web server started!");
+    Serial.println("✅ Web server started!");
     Serial.print("   Access at: http://");
     Serial.println(WiFi.localIP());
+    
+    Serial.println("\n=== System Ready ===\n");
   }
 }
 
@@ -133,11 +165,12 @@ void loop() {
     return;
   }
 
+  // WiFi reconnection
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long lastAttempt = 0;
     unsigned long now = millis();
     if (now - lastAttempt > 10000) {
-      Serial.println("WiFi lost, reconnecting...");
+      Serial.println("⚠️ WiFi lost, reconnecting...");
       lastAttempt = now;
       prefs.begin(PREF_NAMESPACE, false);
       ssid = prefs.getString(KEY_SSID, DEFAULT_SSID);
@@ -149,17 +182,18 @@ void loop() {
     return;
   }
 
-  // Maintain MQTT connection
+  // MQTT maintenance
   if (!mqttClient.connected()) {
     reconnectMQTT();
   }
   mqttClient.loop();
 
+  // Read from Arduino
   if (Serial2.available()) {
     String data = Serial2.readStringUntil('\n');
     data.trim();
     if (data.length() > 0) {
-      Serial.print("Received: ");
+      Serial.print("📥 Arduino: ");
       Serial.println(data);
       
       int first = data.indexOf(',');
@@ -177,7 +211,7 @@ void loop() {
           manualMode = data.substring(fourth + 1).toInt() == 1;
         }
         
-        Serial.printf("Parsed: T=%.1f H=%.1f WL=%d Pump=%s Mode=%s\n", 
+        Serial.printf("📊 T=%.1f°C H=%.1f%% WL=%d%% Pump=%s Mode=%s\n", 
           temperature, humidity, waterLevel, 
           pumpStatus ? "ON" : "OFF",
           manualMode ? "MANUAL" : "AUTO");
@@ -185,6 +219,7 @@ void loop() {
     }
   }
 
+  // Send to backend periodically
   unsigned long now = millis();
   if (now - lastSendTime >= sendInterval) {
     lastSendTime = now;
@@ -197,24 +232,55 @@ void loop() {
     jsonPayload += "\"manualMode\":" + String(manualMode ? "true" : "false");
     jsonPayload += "}";
     
-    String resolvedUrl = resolveServerUrl(serverUrl);
-    
-    HTTPClient http;
-    http.setTimeout(5000);
-    http.begin(resolvedUrl);
-    http.addHeader("Content-Type", "application/json");
-    
-    int httpResponseCode = http.POST(jsonPayload);
-    
-    if (httpResponseCode > 0) {
-      Serial.printf("✓ Backend success (%d)\n", httpResponseCode);
+    if (sendToBackend(jsonPayload)) {
+      lastBackendSuccess = now;
+      backendReachable = true;
     } else {
-      Serial.printf("✗ Backend error (%d)\n", httpResponseCode);
+      backendReachable = false;
     }
-    http.end();
   }
 
   delay(10);
+}
+
+bool sendToBackend(String jsonPayload) {
+  HTTPClient http;
+  http.setTimeout(5000);
+  http.begin(resolvedServerUrl);
+  http.addHeader("Content-Type", "application/json");
+  
+  int httpResponseCode = http.POST(jsonPayload);
+  
+  if (httpResponseCode > 0) {
+    Serial.printf("✅ Backend OK (HTTP %d)\n", httpResponseCode);
+    http.end();
+    return true;
+  } else {
+    Serial.printf("❌ Backend error (HTTP %d: %s)\n", 
+      httpResponseCode, http.errorToString(httpResponseCode).c_str());
+    
+    // Try fallback IP if mDNS failed
+    if (resolvedServerUrl.indexOf(".local") != -1 || resolvedServerUrl.indexOf("agricool-server") != -1) {
+      http.end();
+      String fallbackUrl = "http://" + fallback_server_ip.toString() + ":8081/api/sensors";
+      Serial.print("   Trying fallback: ");
+      Serial.println(fallbackUrl);
+      
+      http.begin(fallbackUrl);
+      http.addHeader("Content-Type", "application/json");
+      httpResponseCode = http.POST(jsonPayload);
+      
+      if (httpResponseCode > 0) {
+        Serial.printf("✅ Fallback OK (HTTP %d)\n", httpResponseCode);
+        resolvedServerUrl = fallbackUrl; // Update for next time
+        http.end();
+        return true;
+      }
+    }
+    
+    http.end();
+    return false;
+  }
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -223,14 +289,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     message += (char)payload[i];
   }
   
-  Serial.print("📨 MQTT received on ");
+  Serial.print("📨 MQTT [");
   Serial.print(topic);
-  Serial.print(": ");
+  Serial.print("]: ");
   Serial.println(message);
   
-  // Forward command to Arduino
   Serial2.println(message);
-  Serial.println("✅ Command forwarded to Arduino");
+  Serial.println("✅ Forwarded to Arduino");
 }
 
 void reconnectMQTT() {
@@ -240,45 +305,79 @@ void reconnectMQTT() {
   }
   lastMqttReconnect = now;
   
-  Serial.print("Connecting to MQTT broker at ");
+  Serial.print("🔌 MQTT connecting to ");
   Serial.print(MQTT_SERVER);
   Serial.print(":");
   Serial.print(MQTT_PORT);
   Serial.print("...");
   
-  // Try to connect with a unique client ID
   String clientId = "AgriCool-ESP32-";
   clientId += String(random(0xffff), HEX);
   
   if (mqttClient.connect(clientId.c_str())) {
-    Serial.println(" ✅ CONNECTED!");
+    Serial.println(" ✅");
     mqttClient.subscribe(MQTT_TOPIC);
-    Serial.print("📥 Subscribed to: ");
+    Serial.print("📥 Subscribed: ");
     Serial.println(MQTT_TOPIC);
   } else {
-    Serial.print(" ❌ FAILED, rc=");
+    Serial.print(" ❌ (rc=");
     Serial.print(mqttClient.state());
-    Serial.println();
-    
-    // Print what the error code means
-    switch(mqttClient.state()) {
-      case -4: Serial.println("  → MQTT_CONNECTION_TIMEOUT - Network issue"); break;
-      case -3: Serial.println("  → MQTT_CONNECTION_LOST - Connection dropped"); break;
-      case -2: Serial.println("  → MQTT_CONNECT_FAILED - Cannot reach broker"); break;
-      case -1: Serial.println("  → MQTT_DISCONNECTED"); break;
-      case 1: Serial.println("  → MQTT_CONNECT_BAD_PROTOCOL"); break;
-      case 2: Serial.println("  → MQTT_CONNECT_BAD_CLIENT_ID"); break;
-      case 3: Serial.println("  → MQTT_CONNECT_UNAVAILABLE - Broker not responding"); break;
-      case 4: Serial.println("  → MQTT_CONNECT_BAD_CREDENTIALS"); break;
-      case 5: Serial.println("  → MQTT_CONNECT_UNAUTHORIZED"); break;
-    }
-    
-    // Additional diagnostics
-    Serial.print("  → WiFi Status: ");
-    Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
-    Serial.print("  → Local IP: ");
-    Serial.println(WiFi.localIP());
+    Serial.println(")");
   }
+}
+
+String resolveServerUrl(String url) {
+  if (url.indexOf(".local") == -1) {
+    return url;
+  }
+  
+  int startIdx = url.indexOf("://") + 3;
+  int endIdx = url.indexOf(".local");
+  if (startIdx == -1 || endIdx == -1) {
+    return url;
+  }
+  
+  String hostname = url.substring(startIdx, endIdx);
+  Serial.print("   Querying mDNS for: ");
+  Serial.println(hostname);
+  
+  IPAddress serverIP = MDNS.queryHost(hostname);
+  
+  if (serverIP.toString() == "0.0.0.0" || serverIP.toString() == "(IP unset)") {
+    Serial.println("   ⚠️ mDNS failed, using fallback IP");
+    String fallbackUrl = "http://" + fallback_server_ip.toString() + ":8081/api/sensors";
+    return fallbackUrl;
+  }
+  
+  Serial.print("   ✅ Resolved to: ");
+  Serial.println(serverIP);
+  
+  String resolvedUrl = url;
+  resolvedUrl.replace(hostname + ".local", serverIP.toString());
+  return resolvedUrl;
+}
+
+bool tryStoredWiFi() {
+  startWiFi(ssid.c_str(), pass.c_str());
+  Serial.print("Connecting");
+  unsigned long start = millis();
+  while (millis() - start < 15000) {
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println();
+      return true;
+    }
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  return WiFi.status() == WL_CONNECTED;
+}
+
+void startWiFi(const char* s, const char* p) {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.begin(s, p);
 }
 
 void handleRoot() {
@@ -303,9 +402,9 @@ void handleRoot() {
   html += ".mode{text-align:center;padding:10px;border-radius:5px;margin:10px 0}";
   html += ".mode-manual{background:#ff9800;color:#000}";
   html += ".mode-auto{background:#4CAF50}";
-  html += ".mqtt{text-align:center;padding:5px;border-radius:5px;margin:5px 0;font-size:12px}";
-  html += ".mqtt-on{background:#4CAF50}";
-  html += ".mqtt-off{background:#f44336}";
+  html += ".mqtt,.backend{text-align:center;padding:5px;border-radius:5px;margin:5px 0;font-size:12px}";
+  html += ".mqtt-on,.backend-on{background:#4CAF50}";
+  html += ".mqtt-off,.backend-off{background:#f44336}";
   html += "</style>";
   html += "<script>";
   html += "function sendCommand(cmd){";
@@ -322,6 +421,10 @@ void handleRoot() {
   
   html += "<div class='mqtt " + String(mqttClient.connected() ? "mqtt-on" : "mqtt-off") + "'>";
   html += "MQTT: " + String(mqttClient.connected() ? "CONNECTED ✅" : "DISCONNECTED ❌");
+  html += "</div>";
+  
+  html += "<div class='backend " + String(backendReachable ? "backend-on" : "backend-off") + "'>";
+  html += "Backend: " + String(backendReachable ? "CONNECTED ✅" : "DISCONNECTED ❌");
   html += "</div>";
   
   html += "<div class='card'>";
@@ -349,26 +452,26 @@ void handleRoot() {
 }
 
 void handleManualOn() {
-  Serial.println("📱 Web command: Manual ON");
+  Serial.println("📱 Web: MANUAL_ON");
   Serial2.println("MANUAL_ON");
   manualMode = true;
   pumpStatus = true;
-  webServer.send(200, "text/plain", "Pump turned ON manually");
+  webServer.send(200, "text/plain", "OK");
 }
 
 void handleManualOff() {
-  Serial.println("📱 Web command: Manual OFF");
+  Serial.println("📱 Web: MANUAL_OFF");
   Serial2.println("MANUAL_OFF");
   manualMode = false;
   pumpStatus = false;
-  webServer.send(200, "text/plain", "Pump turned OFF manually");
+  webServer.send(200, "text/plain", "OK");
 }
 
 void handleAutoMode() {
-  Serial.println("🤖 Web command: Auto Mode");
+  Serial.println("🤖 Web: AUTO_MODE");
   Serial2.println("AUTO_MODE");
   manualMode = false;
-  webServer.send(200, "text/plain", "Switched to AUTO mode");
+  webServer.send(200, "text/plain", "OK");
 }
 
 void handleStatus() {
@@ -380,51 +483,6 @@ void handleStatus() {
   json += "\"manualMode\":" + String(manualMode ? "true" : "false");
   json += "}";
   webServer.send(200, "application/json", json);
-}
-
-String resolveServerUrl(String url) {
-  if (url.indexOf(".local") == -1) {
-    return url;
-  }
-  
-  int startIdx = url.indexOf("://") + 3;
-  int endIdx = url.indexOf(".local");
-  if (startIdx == -1 || endIdx == -1) {
-    return url;
-  }
-  
-  String hostname = url.substring(startIdx, endIdx);
-  IPAddress serverIP = MDNS.queryHost(hostname);
-  
-  if (serverIP.toString() == "0.0.0.0") {
-    return url;
-  }
-  
-  String resolvedUrl = url;
-  resolvedUrl.replace(hostname + ".local", serverIP.toString());
-  return resolvedUrl;
-}
-
-bool tryStoredWiFi() {
-  startWiFi(ssid.c_str(), pass.c_str());
-  Serial.println("Connecting (15s timeout)...");
-  unsigned long start = millis();
-  while (millis() - start < 15000) {
-    if (WiFi.status() == WL_CONNECTED) {
-      return true;
-    }
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  return WiFi.status() == WL_CONNECTED;
-}
-
-void startWiFi(const char* s, const char* p) {
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect(true);
-  delay(100);
-  WiFi.begin(s, p);
 }
 
 void startConfigPortal() {

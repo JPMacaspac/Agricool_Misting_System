@@ -1,6 +1,6 @@
 /*
  * AgriCool Misting System - Arduino Mega
- * With LED indicators, buzzer, and MANUAL CONTROL support
+ * UPDATED: Temperature threshold changed to 35°C
  */
 
 #include <DHT.h>
@@ -27,14 +27,14 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define nextion Serial3
 
 // === Config ===
-const float TEMP_THRESHOLD = 32.0;
-const char PHONE_NUMBER[] = "+639214354307";
-const unsigned long SMS_INTERVAL = 10000;
+const float TEMP_THRESHOLD = 35.0;  // CHANGED FROM 32.0 TO 35.0
+const char PHONE_NUMBER[] = "+639912440620";
+const unsigned long SMS_INTERVAL = 60000; // Send SMS every 60 seconds
 
 // === Tank Dimensions - ADJUST THESE FOR YOUR TANK ===
-const float TANK_HEIGHT_CM = 30.0;  // Total tank height
-const float SENSOR_OFFSET_CM = 2.0;  // Distance from sensor to tank top
-const float EMPTY_DISTANCE_CM = 28.0; // Distance when tank is empty
+const float TANK_HEIGHT_CM = 35.0;
+const float SENSOR_OFFSET_CM = 2.0;
+const float EMPTY_DISTANCE_CM = 28.0;
 
 // === Variables ===
 float temperature = 0.0;
@@ -42,23 +42,44 @@ float humidity = 0.0;
 float distanceCM = 0.0;
 int waterPercent = 0;
 bool pumpStatus = false;
-bool manualMode = false;  // Manual override flag
+bool manualMode = false;
 bool alertSent = false;
 unsigned long lastSMSTime = 0;
 unsigned long lastBuzzerTime = 0;
+unsigned long buzzerOnTime = 0;
+bool buzzerState = false;
+unsigned long lastSensorRead = 0;
+unsigned long lastLCDUpdate = 0;
+unsigned long lastDataSend = 0;
+
+// SMS state machine variables (completely non-blocking)
+enum SMSState {
+  SMS_IDLE,
+  SMS_INIT,
+  SMS_WAIT_INIT,
+  SMS_SEND_NUMBER,
+  SMS_WAIT_PROMPT,
+  SMS_SEND_MESSAGE,
+  SMS_WAIT_COMPLETE,
+  SMS_DONE
+};
+SMSState smsState = SMS_IDLE;
+String pendingSMSNumber = "";
+String pendingSMSMessage = "";
+unsigned long smsStateTime = 0;
 
 // === Function Declarations ===
 float readUltrasonicDistance();
-void sendSMS(const char* number, const char* message);
-bool waitFor(const char* target, unsigned long timeout);
+void processSMS();
+void queueSMS(const char* number, const char* message);
 void sendToNextion(String cmd);
 void updateNextion();
 void updateWaterLevelIndicators(int level);
 
 void setup() {
   Serial.begin(9600);
-  Serial1.begin(9600);
   Serial2.begin(9600);
+  Serial1.begin(9600);
   nextion.begin(9600);
 
   pinMode(PUMP_RELAY, OUTPUT);
@@ -67,13 +88,11 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  // Setup LED and Buzzer pins
   pinMode(GREEN_LED, OUTPUT);
   pinMode(YELLOW_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   pinMode(BUZZER, OUTPUT);
   
-  // Turn off all indicators
   digitalWrite(GREEN_LED, LOW);
   digitalWrite(YELLOW_LED, LOW);
   digitalWrite(RED_LED, LOW);
@@ -87,29 +106,34 @@ void setup() {
   lcd.print("AgriCool System");
   lcd.setCursor(0, 1);
   lcd.print("Initializing...");
-  delay(2000);
+  delay(2000); // Only delay during setup is OK
 
   Serial.println("=== AgriCool Misting System ===");
-  Serial.println("Water Level Indicators:");
-  Serial.println("  GREEN  (51-100%): Pin 9");
-  Serial.println("  YELLOW (31-50%):  Pin 10");
-  Serial.println("  RED    (0-30%):   Pin 4");
-  Serial.println("  BUZZER (0-30%):   Pin 5");
-  Serial.println("Manual Control: ENABLED via Serial1");
+  Serial.println("Temperature Threshold: 35°C");
+  Serial.println("ZERO blocking delays - Pump runs continuously!");
+  Serial.println("SMS fully non-blocking with LCD notifications");
   
-  Serial2.println("AT");
-  delay(1000);
-  Serial2.println("AT+CMGF=1");
-  delay(1000);
+  // Quick GSM init (non-blocking after this)
+  Serial1.println("AT");
+  delay(500);
+  Serial1.println("AT+CMGF=1");
+  delay(500);
+  while (Serial1.available()) Serial1.read(); // Clear buffer
+  
   Serial.println("GSM Ready.");
   lcd.clear();
   sendToNextion("t4.txt=\"System Ready\"");
 }
 
 void loop() {
-  // === NEW: Listen for manual commands from ESP32 ===
-  if (Serial1.available()) {
-    String command = Serial1.readStringUntil('\n');
+  unsigned long currentMillis = millis();
+  
+  // === Process SMS in background (COMPLETELY non-blocking) ===
+  processSMS();
+  
+  // === Listen for manual commands from ESP32 ===
+  if (Serial2.available()) {
+    String command = Serial2.readStringUntil('\n');
     command.trim();
     
     if (command == "MANUAL_ON") {
@@ -148,120 +172,128 @@ void loop() {
     }
   }
 
-  humidity = dht.readHumidity();
-  temperature = dht.readTemperature();
-  distanceCM = readUltrasonicDistance();
+  // === Read sensors every 2 seconds ===
+  if (currentMillis - lastSensorRead >= 2000) {
+    lastSensorRead = currentMillis;
+    
+    humidity = dht.readHumidity();
+    temperature = dht.readTemperature();
+    distanceCM = readUltrasonicDistance();
 
-  // === Improved Water Level Calculation ===
-  if (distanceCM <= 0 || distanceCM > EMPTY_DISTANCE_CM) {
-    waterPercent = 0; // No echo or tank empty
-  } else {
-    // Calculate water level: closer distance = more water
-    float waterDepth = EMPTY_DISTANCE_CM - distanceCM;
-    waterPercent = (waterDepth / EMPTY_DISTANCE_CM) * 100.0;
-    waterPercent = constrain(waterPercent, 0, 100);
+    if (distanceCM <= 0 || distanceCM > EMPTY_DISTANCE_CM) {
+      waterPercent = 0;
+    } else {
+      float waterDepth = EMPTY_DISTANCE_CM - distanceCM;
+      waterPercent = (waterDepth / EMPTY_DISTANCE_CM) * 100.0;
+      waterPercent = constrain(waterPercent, 0, 100);
+    }
+
+    updateWaterLevelIndicators(waterPercent);
+
+    if (isnan(temperature) || isnan(humidity)) {
+      Serial.println("Sensor error!");
+      if (smsState == SMS_IDLE) { // Only update LCD if not sending SMS
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Sensor error!");
+      }
+      sendToNextion("t4.txt=\"Sensor Error!\"");
+      return;
+    }
+
+    Serial.print("Temp: "); Serial.print(temperature);
+    Serial.print(" °C | Hum: "); Serial.print(humidity);
+    Serial.print("% | Water: "); Serial.print(waterPercent);
+    Serial.print("% ("); Serial.print(distanceCM); Serial.print("cm)");
+    Serial.print(" | Pump: "); Serial.print(pumpStatus ? "ON" : "OFF");
+    Serial.print(" | Mode: "); Serial.print(manualMode ? "MANUAL" : "AUTO");
+    Serial.print(" | Pin: "); Serial.println(digitalRead(PUMP_RELAY) ? "HIGH" : "LOW");
   }
 
-  // Update LED and buzzer based on water level
-  updateWaterLevelIndicators(waterPercent);
-
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("Sensor error!");
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Sensor error!");
-    sendToNextion("t4.txt=\"Sensor Error!\"");
-    delay(2000);
-    return;
+  // === Send data to ESP32 every 2 seconds ===
+  if (currentMillis - lastDataSend >= 2000) {
+    lastDataSend = currentMillis;
+    
+    String data = String(temperature, 2) + "," +
+                  String(humidity, 2) + "," +
+                  String(waterPercent) + "," +
+                  (pumpStatus ? "1" : "0") + "," +
+                  (manualMode ? "1" : "0");
+    Serial2.println(data);
   }
 
-  Serial.print("Temp: "); Serial.print(temperature);
-  Serial.print(" °C | Hum: "); Serial.print(humidity);
-  Serial.print("% | Water: "); Serial.print(waterPercent);
-  Serial.print("% ("); Serial.print(distanceCM); Serial.print("cm)");
-  Serial.print(" | Pump: "); Serial.print(pumpStatus ? "ON" : "OFF");
-  Serial.print(" | Mode: "); Serial.print(manualMode ? "MANUAL" : "AUTO");
-  Serial.print(" | Pin: "); Serial.println(digitalRead(PUMP_RELAY) ? "HIGH" : "LOW");
-
-  // Send data to ESP32 (now includes manualMode)
-  String data = String(temperature, 2) + "," +
-                String(humidity, 2) + "," +
-                String(waterPercent) + "," +
-                (pumpStatus ? "1" : "0") + "," +
-                (manualMode ? "1" : "0");
-  Serial1.println(data);
-
-  // === Misting Control Logic (ONLY if NOT in manual mode) ===
+  // === Misting Control Logic (INSTANT response, NO blocking) ===
   if (!manualMode) {
     if (temperature >= TEMP_THRESHOLD) {
+      // Keep pump ON continuously when temp >= 35°C
       if (!pumpStatus) {
         digitalWrite(PUMP_RELAY, HIGH);
         pumpStatus = true;
-        Serial.println("🔥 AUTO: Pump ON (Pin HIGH)");
+        Serial.println("🔥 AUTO: Pump ON - Continuous operation until temp < 35°C");
         sendToNextion("t4.txt=\"Auto: Misting ON\"");
       }
 
-      if (!alertSent && millis() - lastSMSTime > SMS_INTERVAL) {
+      // Queue SMS (non-blocking) every 60 seconds
+      if (!alertSent && currentMillis - lastSMSTime > SMS_INTERVAL && smsState == SMS_IDLE) {
         String message = "AgriCool Alert - Temp:" + String(temperature, 1) +
                          "C, Hum:" + String(humidity, 1) +
                          "%, Water:" + String(waterPercent) +
                          "%, Pump: ON";
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("SMS Sending...");
-        sendSMS(PHONE_NUMBER, message.c_str());
-        lcd.clear();
-        lcd.print("SMS Sent!");
-        lastSMSTime = millis();
+        queueSMS(PHONE_NUMBER, message.c_str());
+        lastSMSTime = currentMillis;
         alertSent = true;
       }
 
     } else {
+      // Turn off pump when temp drops below 35°C
       if (pumpStatus) {
         digitalWrite(PUMP_RELAY, LOW);
         pumpStatus = false;
-        Serial.println("❄️ AUTO: Pump OFF (Pin LOW)");
+        Serial.println("❄️ AUTO: Pump OFF - Temp below 35°C");
         sendToNextion("t4.txt=\"Auto: Misting OFF\"");
       }
 
-      if (alertSent && millis() - lastSMSTime > SMS_INTERVAL) {
+      // Queue SMS when cooling down
+      if (alertSent && currentMillis - lastSMSTime > SMS_INTERVAL && smsState == SMS_IDLE) {
         String message = "AgriCool Update - Temp:" + String(temperature, 1) +
                          "C, Hum:" + String(humidity, 1) +
                          "%, Water:" + String(waterPercent) +
                          "%, Pump: OFF";
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("SMS Sending...");
-        sendSMS(PHONE_NUMBER, message.c_str());
-        lcd.clear();
-        lcd.print("SMS Sent!");
-        lastSMSTime = millis();
+        queueSMS(PHONE_NUMBER, message.c_str());
+        lastSMSTime = currentMillis;
         alertSent = false;
       }
     }
   }
 
-  // Update LCD
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("T:");
-  lcd.print(temperature, 1);
-  lcd.print("C H:");
-  lcd.print(humidity, 0);
-  lcd.print("%");
-  lcd.setCursor(0, 1);
-  lcd.print("W:");
-  lcd.print(waterPercent);
-  lcd.print("% ");
-  lcd.print(manualMode ? "M:" : "A:");
-  lcd.print(pumpStatus ? "ON " : "OFF");
+  // === Update LCD every 2 seconds (only if not sending SMS) ===
+  if (currentMillis - lastLCDUpdate >= 2000 && smsState == SMS_IDLE) {
+    lastLCDUpdate = currentMillis;
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("T:");
+    lcd.print(temperature, 1);
+    lcd.print("C H:");
+    lcd.print(humidity, 0);
+    lcd.print("%");
+    lcd.setCursor(0, 1);
+    lcd.print("W:");
+    lcd.print(waterPercent);
+    lcd.print("% ");
+    lcd.print(manualMode ? "M:" : "A:");
+    lcd.print(pumpStatus ? "ON " : "OFF");
 
-  updateNextion();
-  delay(2000);
-
-  while (Serial2.available()) {
-    Serial.write(Serial2.read());
+    updateNextion();
   }
+
+  // Monitor GSM responses (don't block)
+  if (Serial1.available()) {
+    char c = Serial1.read();
+    Serial.write(c);
+  }
+
+  // ABSOLUTELY NO delay() - loop runs as fast as possible!
 }
 
 float readUltrasonicDistance() {
@@ -276,65 +308,140 @@ float readUltrasonicDistance() {
 }
 
 void updateWaterLevelIndicators(int level) {
-  // Turn off all LEDs first
+  unsigned long currentMillis = millis();
+  
   digitalWrite(GREEN_LED, LOW);
   digitalWrite(YELLOW_LED, LOW);
   digitalWrite(RED_LED, LOW);
-  digitalWrite(BUZZER, LOW);
 
   if (level >= 51) {
-    // GREEN: Good water level (51-100%)
     digitalWrite(GREEN_LED, HIGH);
+    digitalWrite(BUZZER, LOW);
+    buzzerState = false;
     
   } else if (level >= 31) {
-    // YELLOW: Medium water level (31-50%)
     digitalWrite(YELLOW_LED, HIGH);
+    digitalWrite(BUZZER, LOW);
+    buzzerState = false;
     
   } else {
-    // RED: Low water level (0-30%)
     digitalWrite(RED_LED, HIGH);
     
-    // Buzzer beeps intermittently (500ms on, 500ms off)
-    if (millis() - lastBuzzerTime > 1000) {
-      digitalWrite(BUZZER, HIGH);
-      delay(100); // Short beep
-      digitalWrite(BUZZER, LOW);
-      lastBuzzerTime = millis();
+    // Non-blocking buzzer
+    if (!buzzerState) {
+      if (currentMillis - lastBuzzerTime >= 1000) {
+        digitalWrite(BUZZER, HIGH);
+        buzzerState = true;
+        buzzerOnTime = currentMillis;
+      }
+    } else {
+      if (currentMillis - buzzerOnTime >= 100) {
+        digitalWrite(BUZZER, LOW);
+        buzzerState = false;
+        lastBuzzerTime = currentMillis;
+      }
     }
   }
 }
 
-void sendSMS(const char* number, const char* message) {
-  Serial.println("Sending SMS...");
-  Serial2.println("AT+CMGF=1");
-  waitFor("OK", 3000);
-  delay(200);
-  while (Serial2.available()) Serial2.read();
-
-  Serial2.print("AT+CMGS=\"");
-  Serial2.print(number);
-  Serial2.println("\"");
-  if (!waitFor(">", 7000)) {
-    Serial.println("❌ No prompt");
+// Queue SMS for background sending (non-blocking)
+void queueSMS(const char* number, const char* message) {
+  if (smsState != SMS_IDLE) {
+    Serial.println("⚠️ SMS already in progress, skipping");
     return;
   }
-
-  Serial2.print(message);
-  Serial2.write(26);
-  waitFor("+CMGS", 20000);
+  
+  pendingSMSNumber = String(number);
+  pendingSMSMessage = String(message);
+  smsState = SMS_INIT;
+  smsStateTime = millis();
+  Serial.println("📤 SMS queued for sending");
+  
+  // Show on LCD
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("SMS Sending...");
 }
 
-bool waitFor(const char* target, unsigned long timeout) {
-  unsigned long start = millis();
-  String response = "";
-  while (millis() - start < timeout) {
-    while (Serial2.available()) {
-      char c = Serial2.read();
-      response += c;
-      if (response.indexOf(target) != -1) return true;
-    }
+// Process SMS in background (COMPLETELY non-blocking state machine)
+void processSMS() {
+  unsigned long currentMillis = millis();
+  
+  switch (smsState) {
+    case SMS_IDLE:
+      // Nothing to do
+      break;
+      
+    case SMS_INIT:
+      // Initialize SMS mode
+      Serial.println("📡 SMS: Init mode");
+      Serial1.println("AT+CMGF=1");
+      smsState = SMS_WAIT_INIT;
+      smsStateTime = currentMillis;
+      break;
+      
+    case SMS_WAIT_INIT:
+      // Wait 300ms for AT command response
+      if (currentMillis - smsStateTime > 300) {
+        while (Serial1.available()) Serial1.read(); // Clear buffer
+        smsState = SMS_SEND_NUMBER;
+        smsStateTime = currentMillis;
+      }
+      break;
+      
+    case SMS_SEND_NUMBER:
+      // Send phone number
+      Serial.println("📡 SMS: Sending number");
+      Serial1.print("AT+CMGS=\"");
+      Serial1.print(pendingSMSNumber);
+      Serial1.println("\"");
+      smsState = SMS_WAIT_PROMPT;
+      smsStateTime = currentMillis;
+      break;
+      
+    case SMS_WAIT_PROMPT:
+      // Wait 500ms for '>' prompt
+      if (currentMillis - smsStateTime > 500) {
+        smsState = SMS_SEND_MESSAGE;
+        smsStateTime = currentMillis;
+      }
+      break;
+      
+    case SMS_SEND_MESSAGE:
+      // Send actual message
+      Serial.println("📡 SMS: Sending message");
+      Serial1.print(pendingSMSMessage);
+      Serial1.write(26); // CTRL+Z
+      smsState = SMS_WAIT_COMPLETE;
+      smsStateTime = currentMillis;
+      break;
+      
+    case SMS_WAIT_COMPLETE:
+      // Wait 2 seconds for send confirmation
+      if (currentMillis - smsStateTime > 2000) {
+        smsState = SMS_DONE;
+        smsStateTime = currentMillis;
+      }
+      break;
+      
+    case SMS_DONE:
+      // Show success on LCD for 1 second
+      Serial.println("✅ SMS sent!");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("SMS Sent!");
+      lcd.setCursor(0, 1);
+      lcd.print("Successfully");
+      
+      // Wait 1 second then return to idle
+      if (currentMillis - smsStateTime > 1000) {
+        smsState = SMS_IDLE;
+        pendingSMSNumber = "";
+        pendingSMSMessage = "";
+        lastLCDUpdate = currentMillis - 2000; // Force LCD update soon
+      }
+      break;
   }
-  return false;
 }
 
 void sendToNextion(String cmd) {
