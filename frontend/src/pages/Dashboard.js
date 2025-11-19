@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import DashboardAnalytics from '../components/DashboardAnalytics';
 import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import {
@@ -687,6 +688,17 @@ export default function Dashboard() {
               Dashboard
             </h2>
 
+
+            {/* Alert */}
+            {sensorData?.pumpStatus && (
+              <div className="bg-red-600 p-4 rounded-lg shadow-md flex items-center gap-2 animate-pulse mb-6">
+                <FaExclamationTriangle className="text-white text-xl" />
+                <p className="font-semibold">
+                  ALERT: Heat Stress Detected - Cooling in Progress
+                </p>
+              </div>
+            )}
+
             {/* System Status */}
             <SystemStatus sensorData={sensorData} pumpMode={pumpMode} />
 
@@ -722,8 +734,18 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Realtime chart */}
+            <div className="mb-6">
+              <RealtimeChart sensor={sensorData} />
+            </div>
+
             {/* Analytics Dashboard */}
             <MistingAnalytics apiBase={API_BASE} sensorData={sensorData} />
+
+            {/* NEW: Dashboard Analytics A-E */}
+            <DashboardAnalytics apiBase={API_BASE} sensorData={sensorData} />
+            <br>
+            </br>
 
             {/* Manual Control Panel */}
             <div className="bg-gray-700 p-6 rounded-lg shadow-md mb-6 border-2 border-[#A1F1FA]">
@@ -782,20 +804,6 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Realtime chart */}
-            <div className="mb-6">
-              <RealtimeChart sensor={sensorData} />
-            </div>
-
-            {/* Alert */}
-            {sensorData?.pumpStatus && (
-              <div className="bg-red-600 p-4 rounded-lg shadow-md flex items-center gap-2 animate-pulse">
-                <FaExclamationTriangle className="text-white text-xl" />
-                <p className="font-semibold">
-                  ALERT: Heat Stress Detected - Cooling in Progress
-                </p>
-              </div>
-            )}
           </div>
         </main>
       </div>

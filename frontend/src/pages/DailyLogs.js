@@ -4,6 +4,8 @@ import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar, FaBell } from 
 import NotificationPanel from '../components/NotificationPanel';
 import MistingCharts from '../components/MistingCharts';
 
+
+
 export function LogsTable({ logs }) {
     return (
         <div className="bg-[#2B3848] rounded-lg shadow-md p-4 mt-2 overflow-x-auto">
@@ -37,11 +39,10 @@ export function LogsTable({ logs }) {
                                 <td className="py-3 px-4">{row.date}</td>
                                 <td className="py-3 px-4">{row.time}</td>
                                 <td className="py-3 px-4">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                        row.mistingType === 'MANUAL' 
-                                            ? 'bg-orange-600 text-white' 
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${row.mistingType === 'MANUAL'
+                                            ? 'bg-orange-600 text-white'
                                             : 'bg-green-600 text-white'
-                                    }`}>
+                                        }`}>
                                         {row.mistingType === 'MANUAL' ? 'MANUAL' : 'AUTO'}
                                     </span>
                                 </td>
@@ -63,6 +64,7 @@ export function LogsTable({ logs }) {
 }
 
 export default function DailyLogs() {
+    const [showCharts, setShowCharts] = useState(true);
     const [query, setQuery] = useState("");
     const [month, setMonth] = useState("");
     const [year, setYear] = useState("");
@@ -86,7 +88,7 @@ export default function DailyLogs() {
 
         // Listen for storage changes
         window.addEventListener('storage', handleStorageChange);
-        
+
         // Also check periodically in case changes happen in same tab
         const interval = setInterval(() => {
             const currentPic = localStorage.getItem("profilePicture") || "";
@@ -107,15 +109,15 @@ export default function DailyLogs() {
             try {
                 setLoading(true);
                 setError(null);
-                
+
                 const response = await fetch(`${API_BASE}/api/misting/logs`);
-                
+
                 if (!response.ok) {
                     throw new Error('Failed to fetch misting logs');
                 }
-                
+
                 const data = await response.json();
-                
+
                 const computeHeatIndexC = (tempC, rh) => {
                     if (tempC === undefined || tempC === null || rh === undefined || rh === null) return '--';
                     const T = parseFloat(tempC);
@@ -131,19 +133,19 @@ export default function DailyLogs() {
                 const formattedLogs = data.map(item => {
                     const startDate = new Date(item.startTime);
                     const endDate = item.endTime ? new Date(item.endTime) : null;
-                    const duration = endDate ? 
-                        Math.round((endDate - startDate) / 60000) : 
+                    const duration = endDate ?
+                        Math.round((endDate - startDate) / 60000) :
                         0; // ✅ Changed from 'In Progress' to 0
-                    
+
                     const temp = item.startTemperature ? parseFloat(item.startTemperature) : null;
                     const hum = item.startHumidity ? parseFloat(item.startHumidity) : null;
                     const hi = item.startHeatIndex ? parseFloat(item.startHeatIndex) : null;
 
                     return {
-                        date: startDate.toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
+                        date: startDate.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
                         }),
                         time: startDate.toLocaleTimeString('en-US', {
                             hour: '2-digit',
@@ -162,7 +164,7 @@ export default function DailyLogs() {
                 });
 
                 formattedLogs.sort((a, b) => b.rawDate - a.rawDate);
-                
+
                 setLogs(formattedLogs);
                 setLoading(false);
             } catch (err) {
@@ -175,7 +177,7 @@ export default function DailyLogs() {
         fetchLogs();
 
         const interval = setInterval(fetchLogs, 30000);
-        
+
         return () => clearInterval(interval);
     }, [API_BASE]);
 
@@ -312,7 +314,7 @@ export default function DailyLogs() {
                             background: #6b7280;
                         }
                     `}</style>
-                    
+
                     <div className="p-6">
                         <h2 className="text-lg font-semibold mb-6 text-[#A1F1FA]">
                             Misting Event Logs
@@ -381,7 +383,26 @@ export default function DailyLogs() {
                                 {error}
                             </div>
                         )}
-                        {!loading && !error && <MistingCharts logs={filtered} />}
+                        {/* Slide Toggle Button (middle right) */}
+                        <button
+                            onClick={() => setShowCharts(!showCharts)}
+                            className="fixed right-0 top-1/2 transform -translate-y-1/2 z-30 bg-[#2B3848] hover:bg-[#3F4D61] 
+               text-white px-3 py-2 rounded-l-lg shadow-lg transition"
+                        >
+                            {showCharts ? '⮜ Hide Charts' : '⮞ Show Charts'}
+                        </button>
+
+                        {/* Slide-in Charts Panel - ADJUSTED SIZE */}
+                        <div
+                            className={`fixed right-0 top-[137px] h-[calc(100vh-137px)] w-[94%] bg-gray-900 shadow-xl z-20 overflow-y-auto custom-scrollbar
+                transform transition-transform duration-500 
+                ${showCharts ? 'translate-x-0' : 'translate-x-full'}`}
+                        >
+                            <div className="p-6 h-auto bg-[#1f2937]">
+                                <MistingCharts logs={filtered} />
+                            </div>
+                        </div>
+
                         {!loading && !error && <LogsTable logs={paginated} />}
 
                         {!loading && !error && (
