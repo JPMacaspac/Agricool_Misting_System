@@ -6,9 +6,12 @@ import Dashboard from "./pages/Dashboard";
 import ProfilePage from "./pages/Profile";
 import DailyLogs from './pages/DailyLogs'; 
 import Records from './pages/Records';
-
+import Reports from './components/Reports';
 
 export default function App() {
+  // Define apiBase - Use existing env variable
+  const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+
   return (
     <Router>
       <Routes>
@@ -18,6 +21,7 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/daily-logs" element={<DailyLogs />} />
         <Route path="/records" element={<Records />} />
+        <Route path="/reports" element={<Reports apiBase={apiBase} />} />
       </Routes>
     </Router>
   );

@@ -17,6 +17,10 @@ export class Sensor {
   @Column('boolean')
   pumpStatus: boolean;
 
+  @Column('boolean', { default: false })  // ADD THIS
+  manualMode: boolean;                     // ADD THIS
+
+
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -75,21 +75,6 @@ export default function NotificationPanel({ apiBase }) {
     }
   };
 
-  const getNotificationColor = (type) => {
-    switch (type) {
-      case 'pump_on':
-        return 'bg-blue-600/20 border-blue-500';
-      case 'pump_off':
-        return 'bg-gray-600/20 border-gray-500';
-      case 'high_temp':
-        return 'bg-red-600/20 border-red-500';
-      case 'low_water':
-        return 'bg-yellow-600/20 border-yellow-500';
-      default:
-        return 'bg-gray-600/20 border-gray-500';
-    }
-  };
-
   return (
     <div className="relative">
       {/* Notification Bell Button */}

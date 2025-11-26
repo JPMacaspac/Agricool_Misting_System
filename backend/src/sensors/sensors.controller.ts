@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { SensorsService } from './sensors.service';
 import { MqttService } from '../mqtt.service';
 import { NotificationService } from '../notifications/notification.service'; // ADD THIS
+import { ThermalRecordService } from '../thermal-records/thermal-record.service';
 
 interface SensorDataDto {
   temperature: number;
@@ -10,6 +11,10 @@ interface SensorDataDto {
   waterLevel: number;
   pumpStatus: boolean;
   manualMode?: boolean; // ADD THIS
+  pigBodyTemp?: number;      // ADD THESE
+  pigMinTemp?: number;        // ADD THESE
+  pigAvgTemp?: number;        // ADD THESE
+  pigTempValid?: boolean;     // ADD THESE
 }
 
 interface MistingStartDto {
@@ -35,23 +40,55 @@ export class SensorsController {
     private readonly sensorsService: SensorsService,
     private readonly mqttService: MqttService,
     private readonly notificationService: NotificationService, // ADD THIS
+    private readonly thermalRecordService: ThermalRecordService,
   ) {}
 
-  @Post()
-  async create(@Body() data: SensorDataDto) {
-    console.log('Received sensor data:', data);
-    const sensor = await this.sensorsService.create(data);
-    
-    // Track misting type based on manualMode flag
-    if (data.manualMode !== undefined) {
-      this.currentMode = data.manualMode ? 'MANUAL' : 'AUTO';
-    }
-    
-    // ✅ ADD: Check for pump status changes and create notifications
-    await this.checkPumpStatusChange(sensor);
-    
-    return sensor;
+@Post()
+async create(@Body() createSensorDto: {
+  temperature: number;
+  humidity: number;
+  waterLevel: number;
+  pumpStatus: boolean;
+  manualMode?: boolean;
+  pigBodyTemp?: number;
+  pigMinTemp?: number;
+  pigAvgTemp?: number;
+  pigTempValid?: boolean;
+}) {
+  console.log('Received sensor data:', createSensorDto);
+  
+  // Save sensor data (existing)
+  const sensor = await this.sensorsService.create({
+    temperature: createSensorDto.temperature,
+    humidity: createSensorDto.humidity,
+    waterLevel: createSensorDto.waterLevel,
+    pumpStatus: createSensorDto.pumpStatus,
+    manualMode: createSensorDto.manualMode,
+  });
+
+  // Track misting type based on manualMode flag
+  if (createSensorDto.manualMode !== undefined) {
+    this.currentMode = createSensorDto.manualMode ? 'MANUAL' : 'AUTO';
   }
+
+  // Save thermal data if valid
+  if (createSensorDto.pigTempValid && createSensorDto.pigAvgTemp) {
+    try {
+      await this.thermalRecordService.create({
+        maxTemp: createSensorDto.pigBodyTemp,
+        minTemp: createSensorDto.pigMinTemp,
+        avgTemp: createSensorDto.pigAvgTemp,
+      });
+    } catch (error) {
+      console.error('Error saving thermal record:', error);
+    }
+  }
+
+  // Check for pump status changes and create notifications
+  await this.checkPumpStatusChange(sensor);
+  
+  return { success: true, data: sensor };
+}
 
   @Get()
   findAll() {
@@ -132,6 +169,8 @@ export class SensorsController {
       message: 'Switched to AUTO mode',
     };
   }
+
+  
 
   @Get('stream')
   async stream(@Req() req: Request, @Res() res: Response) {

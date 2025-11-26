@@ -58,8 +58,13 @@ export default function MistingCharts({ logs }) {
       return acc;
     }, {});
 
-    // Get last 10 dates
-    const dates = Object.keys(groupedByDate).slice(-10);
+    // Sort dates chronologically and get last 10
+    const dates = Object.keys(groupedByDate).sort((a, b) => {
+      // Convert "November 22, 2025" format to comparable date
+      const dateA = new Date(a);
+      const dateB = new Date(b);
+      return dateA - dateB;
+    }).slice(-10); // Get the most recent 10 dates
     
     // Calculate averages
     const avgTemps = dates.map(date => {
@@ -168,33 +173,30 @@ export default function MistingCharts({ logs }) {
     ],
   };
 
-const microclimateOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: { duration: 900, easing: "easeOutQuart" },
-  interaction: { mode: "index", intersect: false },
-  plugins: { legend: { labels: { color: "#cbd5e1" }}},
-  scales: {
-    x: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" }},
-    y: { 
-      type: "linear",
-      position: "left",
-      ticks: { color: "#9ca3af" },
-      grid: { color: "#374151" },
-      title: { display: true, text: "Temperature (°C)", color: "#9ca3af" }
+  const microclimateOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 900, easing: "easeOutQuart" },
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { labels: { color: "#cbd5e1" }}},
+    scales: {
+      x: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" }},
+      y: { 
+        type: "linear",
+        position: "left",
+        ticks: { color: "#9ca3af" },
+        grid: { color: "#374151" },
+        title: { display: true, text: "Temperature (°C)", color: "#9ca3af" }
+      },
+      y1: { 
+        type: "linear", 
+        position: "right", 
+        ticks: { color: "#9ca3af" },
+        grid: { display: false },
+        title: { display: true, text: "Humidity (%)", color: "#9ca3af" }
+      },
     },
-    y1: { 
-      type: "linear", 
-      position: "right", 
-      ticks: { color: "#9ca3af" },
-      grid: { display: false },
-      title: { display: true, text: "Humidity (%)", color: "#9ca3af" }
-    },
-  },
-    // ADD THIS TO CHANGE THE BACKGROUND COLOR:
-  backgroundColor: '#1f2937',  // or whatever color you want
-};
-
+  };
 
   // F. Before & After Comparison
   const beforeAfterData = {
@@ -213,23 +215,22 @@ const microclimateOptions = {
     ],
   };
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: {
-    duration: 900,
-    easing: "easeOutQuart",
-  },
-  plugins: {
-    legend: { labels: { color: "#cbd5e1" }, position: "top" },
-    tooltip: { mode: "index", intersect: false },
-  },
-  scales: {
-    x: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" }},
-    y: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" }},
-  },
-};
-  
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 900,
+      easing: "easeOutQuart",
+    },
+    plugins: {
+      legend: { labels: { color: "#cbd5e1" }, position: "top" },
+      tooltip: { mode: "index", intersect: false },
+    },
+    scales: {
+      x: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" }},
+      y: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" }},
+    },
+  };
 
   if (chartData.dates.length === 0) {
     return (

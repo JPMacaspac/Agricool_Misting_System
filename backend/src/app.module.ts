@@ -8,6 +8,8 @@ import { MistingModule } from './misting/misting.module';
 import { MistingLog } from './misting/misting-log.entity';
 import { NotificationModule } from './notifications/notification.module';
 import { Notification } from './notifications/notification.entity';
+import { ThermalRecordModule } from './thermal-records/thermal-record.module';
+import { ThermalRecord } from './thermal-records/thermal-record.entity';
 
 @Module({
   imports: [
@@ -16,15 +18,16 @@ import { Notification } from './notifications/notification.entity';
       host: 'localhost',
       port: 3306,
       username: 'root',
-      password: '', // your MySQL password if any
-      database: 'agricooldb', // your database name
-      entities: [User, Sensor, MistingLog, Notification],
-      synchronize: true, // automatically creates the table if not exists
+      password: '',
+      database: 'agricooldb',
+      entities: [User, Sensor, MistingLog, Notification, ThermalRecord],
+      synchronize: true,
     }),
     UsersModule,
     SensorsModule,
     MistingModule,
     NotificationModule,
+    ThermalRecordModule,
   ],
 })
 export class AppModule {}

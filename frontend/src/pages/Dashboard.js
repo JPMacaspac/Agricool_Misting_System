@@ -15,7 +15,7 @@ import {
   FaRedo,
   FaClock,
   FaFire,
-  FaSnowflake,
+  FaFileAlt,
 } from "react-icons/fa";
 import { MdOutlineHeatPump } from "react-icons/md";
 import { Line } from 'react-chartjs-2';
@@ -130,18 +130,18 @@ function RealtimeChart({ sensor }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { 
+      legend: {
         labels: { color: '#cbd5e1' },
         position: 'top',
       },
       tooltip: { mode: 'index', intersect: false },
     },
     scales: {
-      x: { 
+      x: {
         ticks: { color: '#9ca3af' },
         grid: { color: '#374151' }
       },
-      y: { 
+      y: {
         ticks: { color: '#9ca3af' },
         grid: { color: '#374151' }
       },
@@ -180,7 +180,7 @@ function MistingAnalytics({ apiBase, sensorData }) {
         // Filter for today's logs
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         const logs = allLogs.filter(log => {
           const logDate = new Date(log.startTime);
           return logDate >= today;
@@ -198,11 +198,11 @@ function MistingAnalytics({ apiBase, sensorData }) {
 
           // Calculate avg temp and humidity
           const validLogs = logs.filter(log => log.startTemperature && log.startHumidity);
-          const avgTemp = validLogs.length > 0 
-            ? validLogs.reduce((sum, log) => sum + (log.startTemperature || 0), 0) / validLogs.length 
+          const avgTemp = validLogs.length > 0
+            ? validLogs.reduce((sum, log) => sum + (log.startTemperature || 0), 0) / validLogs.length
             : 0;
-          const avgHum = validLogs.length > 0 
-            ? validLogs.reduce((sum, log) => sum + (log.startHumidity || 0), 0) / validLogs.length 
+          const avgHum = validLogs.length > 0
+            ? validLogs.reduce((sum, log) => sum + (log.startHumidity || 0), 0) / validLogs.length
             : 0;
 
           // Find peak and lowest temp
@@ -233,7 +233,7 @@ function MistingAnalytics({ apiBase, sensorData }) {
   return (
     <div className="bg-gray-700 p-6 rounded-lg shadow-md mb-6">
       <h3 className="text-xl font-bold text-[#A1F1FA] mb-4">Today's Analytics</h3>
-      
+
       <div className="grid grid-cols-4 gap-4">
         {/* Misting Count */}
         <div className="bg-gray-800 p-4 rounded-lg border-l-4 border-blue-500">
@@ -432,7 +432,7 @@ export default function Dashboard() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    
+
     const interval = setInterval(() => {
       const currentPic = localStorage.getItem("profilePicture") || "";
       if (currentPic !== profilePicture) {
@@ -638,7 +638,7 @@ export default function Dashboard() {
         {/* Fixed Sidebar */}
         <aside className="bg-gray-900 w-20 flex flex-col items-center p-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0">
           <button
-            className="hover:text-[#A1F1FA] transition duration-200 text-[#A1F1FA]"
+            className="text-[#A1F1FA] transition duration-200 bg-gray-800 p-3 rounded-lg border-2 border-[#A1F1FA]"
             title="Dashboard"
             onClick={() => navigate('/dashboard')}
           >
@@ -646,7 +646,7 @@ export default function Dashboard() {
           </button>
 
           <button
-            className="hover:text-[#A1F1FA] transition duration-200"
+            className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
             title="Daily Log"
             onClick={() => navigate('/daily-logs')}
           >
@@ -654,11 +654,19 @@ export default function Dashboard() {
           </button>
 
           <button
-            className="hover:text-[#A1F1FA] transition duration-200"
+            className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
             title="Records"
             onClick={() => navigate('/records')}
           >
             <FaClipboardList className="text-2xl" />
+          </button>
+
+          <button
+            className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
+            title="Reports"
+            onClick={() => navigate('/reports')}
+          >
+            <FaFileAlt className="text-2xl" />
           </button>
 
           <div className="flex-1"></div>
@@ -687,7 +695,6 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold mb-6 text-[#A1F1FA]">
               Dashboard
             </h2>
-
 
             {/* Alert */}
             {sensorData?.pumpStatus && (
@@ -744,8 +751,7 @@ export default function Dashboard() {
 
             {/* NEW: Dashboard Analytics A-E */}
             <DashboardAnalytics apiBase={API_BASE} sensorData={sensorData} />
-            <br>
-            </br>
+            <br></br>
 
             {/* Manual Control Panel */}
             <div className="bg-gray-700 p-6 rounded-lg shadow-md mb-6 border-2 border-[#A1F1FA]">
@@ -755,8 +761,8 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-400">Override automatic temperature control</p>
                 </div>
                 <div className={`px-4 py-2 rounded-lg font-semibold text-sm ${pumpMode === 'manual'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-green-600 text-white'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-green-600 text-white'
                   }`}>
                   {pumpMode === 'manual' ? 'MANUAL MODE' : 'AUTO MODE'}
                 </div>

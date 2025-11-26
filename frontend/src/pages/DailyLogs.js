@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar, FaBell } from "react-icons/fa";
+import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar, FaFileAlt } from "react-icons/fa";
 import NotificationPanel from '../components/NotificationPanel';
 import MistingCharts from '../components/MistingCharts';
-
-
 
 export function LogsTable({ logs }) {
     return (
@@ -80,16 +78,14 @@ export default function DailyLogs() {
     const userName = localStorage.getItem("userName") || "Jp Macaspac";
     const navigate = useNavigate();
 
-    // ✅ NEW: Sync profile picture from localStorage
+    // Sync profile picture from localStorage
     useEffect(() => {
         const handleStorageChange = () => {
             setProfilePicture(localStorage.getItem("profilePicture") || "");
         };
 
-        // Listen for storage changes
         window.addEventListener('storage', handleStorageChange);
 
-        // Also check periodically in case changes happen in same tab
         const interval = setInterval(() => {
             const currentPic = localStorage.getItem("profilePicture") || "";
             if (currentPic !== profilePicture) {
@@ -104,82 +100,80 @@ export default function DailyLogs() {
     }, [profilePicture]);
 
     // Fetch misting event logs from backend
-    useEffect(() => {
-        const fetchLogs = async () => {
-            try {
-                setLoading(true);
-                setError(null);
+    const fetchLogs = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
 
-                const response = await fetch(`${API_BASE}/api/misting/logs`);
+            const response = await fetch(`${API_BASE}/api/misting/logs`);
 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch misting logs');
-                }
-
-                const data = await response.json();
-
-                const computeHeatIndexC = (tempC, rh) => {
-                    if (tempC === undefined || tempC === null || rh === undefined || rh === null) return '--';
-                    const T = parseFloat(tempC);
-                    const R = parseFloat(rh);
-                    if (Number.isNaN(T) || Number.isNaN(R)) return '--';
-
-                    const Tf = (T * 9) / 5 + 32;
-                    const HI = -42.379 + 2.04901523 * Tf + 10.14333127 * R - 0.22475541 * Tf * R - 6.83783e-3 * Tf * Tf - 5.481717e-2 * R * R + 1.22874e-3 * Tf * Tf * R + 8.5282e-4 * Tf * R * R - 1.99e-6 * Tf * Tf * R * R;
-                    const HIc = ((HI - 32) * 5) / 9;
-                    return HIc.toFixed(1);
-                };
-
-                const formattedLogs = data.map(item => {
-                    const startDate = new Date(item.startTime);
-                    const endDate = item.endTime ? new Date(item.endTime) : null;
-                    const duration = endDate ?
-                        Math.round((endDate - startDate) / 60000) :
-                        0; // ✅ Changed from 'In Progress' to 0
-
-                    const temp = item.startTemperature ? parseFloat(item.startTemperature) : null;
-                    const hum = item.startHumidity ? parseFloat(item.startHumidity) : null;
-                    const hi = item.startHeatIndex ? parseFloat(item.startHeatIndex) : null;
-
-                    return {
-                        date: startDate.toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        }),
-                        time: startDate.toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        }),
-                        mistingType: item.mistingType || 'AUTO',
-                        temperature: temp !== null ? temp.toFixed(1) : '--',
-                        humidity: hum !== null ? hum.toFixed(1) : '--',
-                        heatIndex: hi !== null ? hi.toFixed(1) : (temp !== null && hum !== null ? computeHeatIndexC(temp, hum) : '--'),
-                        waterLevel: item.startWaterLevel ? parseFloat(item.startWaterLevel).toFixed(1) : '--',
-                        duration: duration, // ✅ Always a number now (0 if no endTime)
-                        status: 'Completed', // ✅ Always show as Completed
-                        rawDate: startDate
-                    };
-                });
-
-                formattedLogs.sort((a, b) => b.rawDate - a.rawDate);
-
-                setLogs(formattedLogs);
-                setLoading(false);
-            } catch (err) {
-                console.error('Error fetching misting logs:', err);
-                setError('Failed to load misting logs. Please try again later.');
-                setLoading(false);
+            if (!response.ok) {
+                throw new Error('Failed to fetch misting logs');
             }
-        };
 
-        fetchLogs();
+            const data = await response.json();
 
-        const interval = setInterval(fetchLogs, 30000);
+            const computeHeatIndexC = (tempC, rh) => {
+                if (tempC === undefined || tempC === null || rh === undefined || rh === null) return '--';
+                const T = parseFloat(tempC);
+                const R = parseFloat(rh);
+                if (Number.isNaN(T) || Number.isNaN(R)) return '--';
 
-        return () => clearInterval(interval);
+                const Tf = (T * 9) / 5 + 32;
+                const HI = -42.379 + 2.04901523 * Tf + 10.14333127 * R - 0.22475541 * Tf * R - 6.83783e-3 * Tf * Tf - 5.481717e-2 * R * R + 1.22874e-3 * Tf * Tf * R + 8.5282e-4 * Tf * R * R - 1.99e-6 * Tf * Tf * R * R;
+                const HIc = ((HI - 32) * 5) / 9;
+                return HIc.toFixed(1);
+            };
+
+            const formattedLogs = data.map(item => {
+                const startDate = new Date(item.startTime);
+                const endDate = item.endTime ? new Date(item.endTime) : null;
+                const duration = endDate ?
+                    Math.round((endDate - startDate) / 60000) :
+                    0;
+
+                const temp = item.startTemperature ? parseFloat(item.startTemperature) : null;
+                const hum = item.startHumidity ? parseFloat(item.startHumidity) : null;
+                const hi = item.startHeatIndex ? parseFloat(item.startHeatIndex) : null;
+
+                return {
+                    date: startDate.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }),
+                    time: startDate.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    }),
+                    mistingType: item.mistingType || 'AUTO',
+                    temperature: temp !== null ? temp.toFixed(1) : '--',
+                    humidity: hum !== null ? hum.toFixed(1) : '--',
+                    heatIndex: hi !== null ? hi.toFixed(1) : (temp !== null && hum !== null ? computeHeatIndexC(temp, hum) : '--'),
+                    waterLevel: item.startWaterLevel ? parseFloat(item.startWaterLevel).toFixed(1) : '--',
+                    duration: duration,
+                    status: 'Completed',
+                    rawDate: startDate
+                };
+            });
+
+            formattedLogs.sort((a, b) => b.rawDate - a.rawDate);
+
+            setLogs(formattedLogs);
+            setLoading(false);
+        } catch (err) {
+            console.error('Error fetching misting logs:', err);
+            setError('Failed to load misting logs. Please try again later.');
+            setLoading(false);
+        }
     }, [API_BASE]);
+
+    useEffect(() => {
+        fetchLogs();
+        const interval = setInterval(fetchLogs, 30000);
+        return () => clearInterval(interval);
+    }, [fetchLogs]);
 
     // Filter logs based on search query and filters
     const filtered = useMemo(() => {
@@ -222,7 +216,7 @@ export default function DailyLogs() {
                 <h1 className="text-xl font-bold">AgriCool</h1>
 
                 <div className="flex items-center gap-4">
-                    {/* ✅ NEW: Notification Panel */}
+                    {/* Notification Panel */}
                     <NotificationPanel apiBase={API_BASE} />
 
                     {/* User Menu */}
@@ -269,7 +263,7 @@ export default function DailyLogs() {
                 {/* Fixed Sidebar */}
                 <aside className="bg-gray-900 w-20 flex flex-col items-center p-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0">
                     <button
-                        className="hover:text-[#A1F1FA] transition duration-200"
+                        className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
                         title="Dashboard"
                         onClick={() => navigate('/dashboard')}
                     >
@@ -277,7 +271,7 @@ export default function DailyLogs() {
                     </button>
 
                     <button
-                        className="hover:text-[#A1F1FA] transition duration-200 text-[#A1F1FA]"
+                        className="text-[#A1F1FA] transition duration-200 bg-gray-800 p-3 rounded-lg border-2 border-[#A1F1FA]"
                         title="Daily Log"
                         onClick={() => navigate('/daily-logs')}
                     >
@@ -285,11 +279,19 @@ export default function DailyLogs() {
                     </button>
 
                     <button
-                        className="hover:text-[#A1F1FA] transition duration-200"
+                        className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
                         title="Records"
                         onClick={() => navigate('/records')}
                     >
                         <FaClipboardList className="text-2xl" />
+                    </button>
+
+                    <button
+                        className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
+                        title="Reports"
+                        onClick={() => navigate('/reports')}
+                    >
+                        <FaFileAlt className="text-2xl" />
                     </button>
 
                     <div className="flex-1"></div>
@@ -383,6 +385,7 @@ export default function DailyLogs() {
                                 {error}
                             </div>
                         )}
+
                         {/* Slide Toggle Button (middle right) */}
                         <button
                             onClick={() => setShowCharts(!showCharts)}
@@ -392,7 +395,7 @@ export default function DailyLogs() {
                             {showCharts ? '⮜ Hide Charts' : '⮞ Show Charts'}
                         </button>
 
-                        {/* Slide-in Charts Panel - ADJUSTED SIZE */}
+                        {/* Slide-in Charts Panel */}
                         <div
                             className={`fixed right-0 top-[137px] h-[calc(100vh-137px)] w-[94%] bg-gray-900 shadow-xl z-20 overflow-y-auto custom-scrollbar
                 transform transition-transform duration-500 

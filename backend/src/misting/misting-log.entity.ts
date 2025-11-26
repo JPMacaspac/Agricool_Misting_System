@@ -11,8 +11,9 @@ export class MistingLog {
   @Column({ type: 'datetime', nullable: true })
   endTime: Date;
 
+  // ✅ CORRECTED: Default should be 'AUTO' for backward compatibility
   @Column({ default: 'AUTO' }) 
-  mistingType: string; // 'AUTO' | 'MANUAL'  // ← ADD THIS LINE HERE
+  mistingType: string; // 'AUTO' | 'MANUAL'
 
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   startTemperature: number;

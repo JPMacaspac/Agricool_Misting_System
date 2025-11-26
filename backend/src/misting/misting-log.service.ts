@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { MistingLog } from './misting-log.entity';
+import { MistingRealtimeGateway } from './misting-realtime.gateway';
 
 @Injectable()
 export class MistingLogService {
   constructor(
     @InjectRepository(MistingLog)
     private mistingLogRepository: Repository<MistingLog>,
+    private mistingRealtimeGateway: MistingRealtimeGateway,
   ) {}
 
   async getTodayLogs() {
@@ -29,7 +31,7 @@ export class MistingLogService {
       order: {
         startTime: 'DESC',
       },
-      take: 100, // Last 100 logs
+      take: 100,
     });
   }
 
@@ -45,12 +47,18 @@ export class MistingLogService {
 
     const saved = await this.mistingLogRepository.save(log);
     console.log('✅ Misting started, log ID:', saved.id);
+
+    this.mistingRealtimeGateway.emitMistingStarted({
+      logId: saved.id,
+      ...saved,
+    });
+
     return { logId: saved.id, message: 'Misting started' };
   }
 
   async endMisting(id: number, data: any) {
     const log = await this.mistingLogRepository.findOne({ where: { id } });
-    
+
     if (!log) {
       throw new Error('Misting log not found');
     }
@@ -61,8 +69,14 @@ export class MistingLogService {
     log.endHeatIndex = data.heatIndex;
     log.endWaterLevel = data.waterLevel;
 
-    await this.mistingLogRepository.save(log);
+    const saved = await this.mistingLogRepository.save(log);
     console.log('✅ Misting ended, log ID:', id);
+
+    this.mistingRealtimeGateway.emitMistingEnded({
+      logId: saved.id,
+      ...saved,
+    });
+
     return { message: 'Misting ended' };
   }
 }
