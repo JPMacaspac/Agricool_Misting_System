@@ -110,28 +110,28 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     weekAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
-    
+
     // Filter logs from last 7 days
     const weekFiltered = filteredLogs.filter(log => {
       const logDate = new Date(log.startTime);
       return logDate >= weekAgo;
     });
-    
+
     // Sort chronologically (oldest to newest)
-    const sorted = weekFiltered.sort((a, b) => 
+    const sorted = weekFiltered.sort((a, b) =>
       new Date(a.startTime) - new Date(b.startTime)
     );
-    
+
     return sorted;
   }, [filteredLogs]);
 
   // IMPROVED: Get last 10 events with proper sorting
   const last10EventsData = useMemo(() => {
     // Sort all filtered logs chronologically
-    const sorted = [...filteredLogs].sort((a, b) => 
+    const sorted = [...filteredLogs].sort((a, b) =>
       new Date(a.startTime) - new Date(b.startTime)
     );
-    
+
     // Take the most recent 10
     return sorted.slice(-10);
   }, [filteredLogs]);
@@ -140,14 +140,14 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { 
+      legend: {
         labels: { color: '#cbd5e1' },
-        display: true 
+        display: true
       },
-      tooltip: { 
-        mode: 'index', 
+      tooltip: {
+        mode: 'index',
         intersect: false,
-        enabled: true 
+        enabled: true
       }
     },
     scales: {
@@ -159,23 +159,23 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
   // FIXED: Livestock Comfort Index - Now correctly calculates from all logs
   const comfort = useMemo(() => {
     const totalLogs = filteredLogs.length;
-    if (totalLogs === 0) return { 
-      safe: 0, warning: 0, danger: 0, 
-      safeCount: 0, warningCount: 0, dangerCount: 0, 
-      totalLogs: 0 
+    if (totalLogs === 0) return {
+      safe: 0, warning: 0, danger: 0,
+      safeCount: 0, warningCount: 0, dangerCount: 0,
+      totalLogs: 0
     };
-    
+
     const safeCount = filteredLogs.filter(log => log.startTemperature < 30).length;
     const warningCount = filteredLogs.filter(log => log.startTemperature >= 30 && log.startTemperature < 35).length;
     const dangerCount = filteredLogs.filter(log => log.startTemperature >= 35).length;
-    
+
     const safePercent = Math.round((safeCount / totalLogs) * 100);
     const warningPercent = Math.round((warningCount / totalLogs) * 100);
     const dangerPercent = Math.round((dangerCount / totalLogs) * 100);
-    
-    return { 
-      safe: safePercent, 
-      warning: warningPercent, 
+
+    return {
+      safe: safePercent,
+      warning: warningPercent,
       danger: dangerPercent,
       safeCount,
       warningCount,
@@ -183,7 +183,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
       totalLogs
     };
   }, [filteredLogs]);
-  
+
   const comfortData = {
     labels: ['Safe (<30°C)', 'Warning (30-35°C)', 'Danger (≥35°C)'],
     datasets: [{
@@ -199,18 +199,18 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     maintainAspectRatio: false,
     cutout: '60%',
     plugins: {
-      legend: { 
-        labels: { 
+      legend: {
+        labels: {
           color: '#cbd5e1',
           font: { size: 12 },
           padding: 15
         },
         position: 'bottom',
       },
-      tooltip: { 
+      tooltip: {
         enabled: true,
         callbacks: {
-          label: function(context) {
+          label: function (context) {
             const label = context.label || '';
             const value = context.parsed || 0;
             let count = 0;
@@ -287,19 +287,19 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     safe: filteredLogs.filter(log => log.startTemperature < 30).length,
   }), [filteredLogs]);
 
-  const safePercentage = filteredLogs.length > 0 
-    ? Math.round((alerts.safe / filteredLogs.length) * 100) 
+  const safePercentage = filteredLogs.length > 0
+    ? Math.round((alerts.safe / filteredLogs.length) * 100)
     : 0;
 
   // Get latest log timestamp - MEMOIZED
   const lastUpdated = useMemo(() => {
     const logsWithTime = (logs || []).filter(l => l && l.startTime);
     if (logsWithTime.length === 0) return 'No data';
-    
-    const latestLog = logsWithTime.reduce((a, b) => 
+
+    const latestLog = logsWithTime.reduce((a, b) =>
       new Date(a.startTime) > new Date(b.startTime) ? a : b
     );
-    
+
     return new Date(latestLog.startTime).toLocaleString();
   }, [logs]);
 
@@ -349,23 +349,25 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
       {/* Row 1: Comfort Gauge & Water Usage */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* A. Comfort Gauge - NOW SHOWS DATA WITH PERCENTAGES */}
-        <div className="bg-gray-700 p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Livestock Comfort Index</h3>
-          <div className="h-64 flex items-center justify-center relative">
-            {comfort.totalLogs > 0 ? (
-              <>
-                <Doughnut data={comfortData} options={doughnutOptions} />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-white">{comfort.totalLogs}</div>
-                    <div className="text-xs text-gray-400">Total Events</div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-gray-400">No data available</div>
-            )}
+<div className="bg-gray-700 p-6 rounded-lg shadow-md">
+  <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Livestock Comfort Index</h3>
+  <div className="h-64 relative">
+    {comfort.totalLogs > 0 ? (
+      <>
+        <div className="w-full h-full flex items-center justify-center">
+          <Doughnut data={comfortData} options={doughnutOptions} />
+        </div>
+        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
+          <div className="text-center" style={{ marginTop: '-30px' }}>
+            <div className="text-3xl font-bold text-white">{comfort.totalLogs}</div>
+            <div className="text-xs text-gray-400">Total Events</div>
           </div>
+        </div>
+      </>
+    ) : (
+      <div className="h-full flex items-center justify-center text-gray-400">No data available</div>
+    )}
+  </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
             <div className="bg-green-600/20 p-2 rounded border border-green-600">
               <p className="text-green-400 font-bold text-lg">{comfort.safe}%</p>

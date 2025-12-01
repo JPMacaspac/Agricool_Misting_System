@@ -26,7 +26,7 @@ export default function Reports({ apiBase }) {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBase}/api/misting/all`);
+      const response = await fetch(`${apiBase}/api/misting/logs`);
       const data = await response.json();
       setLogs(data || []);
       

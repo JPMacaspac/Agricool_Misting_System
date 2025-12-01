@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import DashboardAnalytics from '../components/DashboardAnalytics';
+import NotificationPanel from '../components/NotificationPanel'; 
 import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import {
@@ -234,7 +235,7 @@ function MistingAnalytics({ apiBase, sensorData }) {
     <div className="bg-gray-700 p-6 rounded-lg shadow-md mb-6">
       <h3 className="text-xl font-bold text-[#A1F1FA] mb-4">Today's Analytics</h3>
 
-      <div className="grid grid-cols-4 gap-4">
+<div className="grid grid-cols-3 gap-4">
         {/* Misting Count */}
         <div className="bg-gray-800 p-4 rounded-lg border-l-4 border-blue-500">
           <div className="flex items-center gap-2 mb-2">
@@ -264,24 +265,11 @@ function MistingAnalytics({ apiBase, sensorData }) {
           <p className="text-2xl font-bold text-white">{analytics.peakTemperature.toFixed(1)}°C</p>
           <p className="text-xs text-gray-500 mt-1">highest today</p>
         </div>
-
-        {/* Average Temperature */}
-        <div className="bg-gray-800 p-4 rounded-lg border-l-4 border-orange-500">
-          <div className="flex items-center gap-2 mb-2">
-            <FaThermometerHalf className="text-orange-400 text-xl" />
-            <p className="text-sm text-gray-400">Avg Temp</p>
-          </div>
-          <p className="text-2xl font-bold text-white">{analytics.avgTemperature > 0 ? analytics.avgTemperature.toFixed(1) + '°C' : '0.0°C'}</p>
-          <p className="text-xs text-gray-500 mt-1">during misting</p>
-        </div>
       </div>
 
       {/* Additional Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        <div className="bg-gray-800 p-3 rounded-lg">
-          <p className="text-xs text-gray-400 mb-1">Avg Humidity</p>
-          <p className="text-lg font-bold text-blue-300">{analytics.avgHumidity > 0 ? analytics.avgHumidity.toFixed(1) + '%' : '0.0%'}</p>
-        </div>
+      {/* Additional Stats Row */}
+      <div className="grid grid-cols-2 gap-4 mt-4">
         <div className="bg-gray-800 p-3 rounded-lg">
           <p className="text-xs text-gray-400 mb-1">Lowest Temp</p>
           <p className="text-lg font-bold text-cyan-300">{analytics.lowestTemperature.toFixed(1)}°C</p>
@@ -295,60 +283,7 @@ function MistingAnalytics({ apiBase, sensorData }) {
   );
 }
 
-// Notification Panel Component (Simple Bell Icon)
-function NotificationPanel({ apiBase }) {
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await axios.get(`${apiBase}/api/notifications/recent`);
-        setNotifications(response.data || []);
-      } catch (error) {
-        console.log('Notifications not available');
-      }
-    };
-
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [apiBase]);
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setShowNotifications(!showNotifications)}
-        className="relative p-2 hover:bg-gray-700 rounded-full transition"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        {notifications.length > 0 && (
-          <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-        )}
-      </button>
-
-      {showNotifications && (
-        <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-xl p-4 z-20 max-h-96 overflow-y-auto">
-          <h3 className="font-bold text-lg mb-3 text-[#A1F1FA]">Notifications</h3>
-          {notifications.length > 0 ? (
-            notifications.slice(0, 5).map((notif, idx) => (
-              <div key={idx} className="p-3 bg-gray-700 rounded mb-2 text-sm">
-                <p className="text-white">{notif.message || 'System notification'}</p>
-                <p className="text-gray-400 text-xs mt-1">
-                  {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : 'Recent'}
-                </p>
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-400 text-sm">No new notifications</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // System Status Component
 function SystemStatus({ sensorData, pumpMode }) {
