@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { ThermalRecordService } from './thermal-record.service';
 
-@Controller('api')
+@Controller('api/thermal')
 export class ThermalRecordController {
   constructor(private readonly thermalRecordService: ThermalRecordService) {}
 
@@ -14,7 +14,7 @@ export class ThermalRecordController {
     return this.thermalRecordService.getRecords(search, month, year);
   }
 
-  @Post('records')
+  @Post('record')
   async createRecord(@Body() data: any) {
     return this.thermalRecordService.createRecord(data);
   }

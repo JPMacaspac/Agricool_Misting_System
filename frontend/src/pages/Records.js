@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ThermalCamera from '../components/ThermalCamera';
 import { useNavigate } from 'react-router-dom';
 import {
   FaChartBar,
@@ -11,7 +12,7 @@ import {
   FaFileAlt,
 } from 'react-icons/fa';
 
-const API_URL = 'http://localhost:8081/api';
+const API_URL = 'http://localhost:8081/api/thermal';
 
 export default function Records() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -25,7 +26,7 @@ export default function Records() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 15;
-  
+
   const userName = localStorage.getItem("userName") || "Marc Andrei Toledo";
   const profilePicture = localStorage.getItem("profilePicture") || "";
   const navigate = useNavigate();
@@ -35,22 +36,22 @@ export default function Records() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (selectedMonth !== 'all') params.append('month', selectedMonth);
       if (selectedYear !== 'all') params.append('year', selectedYear);
-      
+
       const response = await fetch(`${API_URL}/records?${params}`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch records');
       }
-      
+
       const data = await response.json();
       setPigRecords(data.records || []);
       console.log(`✅ Loaded ${data.count} thermal records`);
-      
+
     } catch (err) {
       console.error('Error fetching records:', err);
       setError(err.message);
@@ -78,7 +79,7 @@ export default function Records() {
     const interval = setInterval(() => {
       fetchRecords();
     }, 10000);
-    
+
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedMonth, selectedYear]);
@@ -116,7 +117,7 @@ export default function Records() {
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(pigRecords.length / recordsPerPage));
-  
+
   const paginatedRecords = useMemo(() => {
     const startIndex = (currentPage - 1) * recordsPerPage;
     return pigRecords.slice(startIndex, startIndex + recordsPerPage);
@@ -140,7 +141,7 @@ export default function Records() {
           background: #6b7280;
         }
       `}</style>
-        
+
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-30">
         <h1 className="text-xl font-bold">AgriCool</h1>
@@ -230,7 +231,7 @@ export default function Records() {
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-[#A1F1FA]">🌡️ Live Thermal Monitoring</h2>
-              
+
               <div className="flex gap-2">
                 <button
                   onClick={handleRefresh}
@@ -247,6 +248,10 @@ export default function Records() {
             <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4 mb-6">
               <p className="text-blue-300 font-semibold">📡 ESP32 Thermal Camera Active</p>
               <p className="text-gray-400 text-sm mt-1">Auto-scanning every 15 seconds. Data refreshes automatically.</p>
+            </div>
+
+            <div className="mb-6">
+              <ThermalCamera espIp="192.168.1.3" />
             </div>
 
             {/* Search and Filters */}
@@ -427,12 +432,11 @@ export default function Records() {
             {/* Modal Content - Scrollable */}
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 rounded-b-2xl">
               {/* Health Status Banner */}
-              <div className={`mb-6 p-4 rounded-lg ${
-                selectedPig.healthStatus === 'Healthy' ? 'bg-green-900/30 border border-green-500' :
-                selectedPig.healthStatus === 'Fever Alert' ? 'bg-red-900/30 border border-red-500' :
-                selectedPig.healthStatus === 'Elevated' ? 'bg-yellow-900/30 border border-yellow-500' :
-                'bg-blue-900/30 border border-blue-500'
-              }`}>
+              <div className={`mb-6 p-4 rounded-lg ${selectedPig.healthStatus === 'Healthy' ? 'bg-green-900/30 border border-green-500' :
+                  selectedPig.healthStatus === 'Fever Alert' ? 'bg-red-900/30 border border-red-500' :
+                    selectedPig.healthStatus === 'Elevated' ? 'bg-yellow-900/30 border border-yellow-500' :
+                      'bg-blue-900/30 border border-blue-500'
+                }`}>
                 <p className="text-sm text-gray-300">Health Status:</p>
                 <p className={`text-2xl font-bold ${getHealthStatusColor(selectedPig.healthStatus)}`}>
                   {selectedPig.healthStatus}

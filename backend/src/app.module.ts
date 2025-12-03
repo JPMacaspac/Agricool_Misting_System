@@ -10,6 +10,7 @@ import { NotificationModule } from './notifications/notification.module';
 import { Notification } from './notifications/notification.entity';
 import { ThermalRecordModule } from './thermal-records/thermal-record.module';
 import { ThermalRecord } from './thermal-records/thermal-record.entity';
+import { PigModule } from './pigs/pig.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ThermalRecord } from './thermal-records/thermal-record.entity';
     MistingModule,
     NotificationModule,
     ThermalRecordModule,
+    PigModule,
   ],
 })
 export class AppModule {}
