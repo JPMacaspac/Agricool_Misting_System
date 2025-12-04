@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
 import { MistingLogService } from './misting-log.service';
 
-@Controller('api/misting')
+@Controller('misting')
 export class MistingLogController {
   constructor(private readonly mistingLogService: MistingLogService) {}
 

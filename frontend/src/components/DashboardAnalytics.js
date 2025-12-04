@@ -27,38 +27,38 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     try {
       const response = await fetch(`${apiBase}/api/misting/logs`);
       const data = await response.json();
-      setLogs(data || []);
+      // ✅ CRITICAL FIX: Ensure logs is always an array
+      setLogs(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch logs:', error);
+      setLogs([]); // ✅ Set to empty array on error
     }
   };
 
   useEffect(() => {
     fetchLogs();
-    const interval = setInterval(fetchLogs, 5000); // Real-time sync every 5 seconds
+    const interval = setInterval(fetchLogs, 5000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase]); // Fixed: added apiBase to dependency array
+  }, [apiBase]);
 
-  // Socket.IO realtime updates - merge incoming misting events into logs immediately
+  // Socket.IO realtime updates
   useEffect(() => {
-    // Use provided apiBase to connect to the same backend (works for LAN IPs)
     const backendUrl = apiBase || process.env.REACT_APP_BACKEND_URL || 'http://localhost:8081';
     const socket = io(backendUrl, { transports: ['websocket', 'polling'] });
 
     const upsertLog = (incoming) => {
       if (!incoming) return;
-      const id = incoming.id || incoming.logId || incoming.id;
+      const id = incoming.id || incoming.logId;
       setLogs(prev => {
-        // Try to replace existing log with same id, otherwise prepend
-        const exists = prev.findIndex(l => l && (l.id === id || l.logId === id));
+        // ✅ SAFETY CHECK: Ensure prev is an array
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const exists = safePrev.findIndex(l => l && (l.id === id || l.logId === id));
         if (exists !== -1) {
-          const next = [...prev];
+          const next = [...safePrev];
           next[exists] = incoming;
           return next;
         }
-        // Prepend newest event so UI can show it right away
-        return [incoming, ...prev].slice(0, 200);
+        return [incoming, ...safePrev].slice(0, 200);
       });
     };
 
@@ -66,9 +66,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     socket.on('disconnect', () => console.log('Socket disconnected'));
 
     socket.on('misting-started', async (data) => {
-      // misting-started includes saved log data
       upsertLog(data);
-      // Refresh full logs list from server to ensure consistency
       await fetchLogs();
     });
 
@@ -78,8 +76,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     });
 
     socket.on('sensor-update', (data) => {
-      // optionally use sensor updates for small realtime UI changes
-      // console.log('sensor-update', data);
+      // optionally use sensor updates
     });
 
     return () => {
@@ -88,13 +85,15 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
       socket.off('sensor-update');
       socket.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
-  // Filter logs by month/year - MEMOIZED for performance
+  // ✅ CRITICAL FIX: Filter logs with safety check
   const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
-      if (!log.startTime) return false;
+    // Ensure logs is always an array
+    const safelogs = Array.isArray(logs) ? logs : [];
+    
+    return safelogs.filter(log => {
+      if (!log || !log.startTime) return false;
       const logDate = new Date(log.startTime);
       const logMonth = logDate.toLocaleString('en-US', { month: 'long' });
       const logYear = logDate.getFullYear().toString();
@@ -105,34 +104,25 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     });
   }, [logs, selectedMonth, selectedYear]);
 
-  // IMPROVED: Get last 7 days of data with proper sorting
+  // Get last 7 days of data
   const last7DaysData = useMemo(() => {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    weekAgo.setHours(0, 0, 0, 0); // Start of day 7 days ago
+    weekAgo.setHours(0, 0, 0, 0);
 
-    // Filter logs from last 7 days
     const weekFiltered = filteredLogs.filter(log => {
       const logDate = new Date(log.startTime);
       return logDate >= weekAgo;
     });
 
-    // Sort chronologically (oldest to newest)
-    const sorted = weekFiltered.sort((a, b) =>
-      new Date(a.startTime) - new Date(b.startTime)
-    );
-
-    return sorted;
+    return weekFiltered.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
   }, [filteredLogs]);
 
-  // IMPROVED: Get last 10 events with proper sorting
+  // Get last 10 events
   const last10EventsData = useMemo(() => {
-    // Sort all filtered logs chronologically
     const sorted = [...filteredLogs].sort((a, b) =>
       new Date(a.startTime) - new Date(b.startTime)
     );
-
-    // Take the most recent 10
     return sorted.slice(-10);
   }, [filteredLogs]);
 
@@ -156,7 +146,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     },
   };
 
-  // FIXED: Livestock Comfort Index - Now correctly calculates from all logs
+  // Livestock Comfort Index
   const comfort = useMemo(() => {
     const totalLogs = filteredLogs.length;
     if (totalLogs === 0) return {
@@ -224,7 +214,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     },
   };
 
-  // IMPROVED: Water Usage with real-time data and proper date labels
+  // Water Usage
   const waterUsageData = useMemo(() => ({
     labels: last7DaysData.map(log => {
       const date = new Date(log.startTime);
@@ -241,7 +231,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     }],
   }), [last7DaysData]);
 
-  // IMPROVED: Efficiency Score with real-time data
+  // Efficiency Score
   const efficiencyData = useMemo(() => ({
     labels: last7DaysData.map(log => {
       const date = new Date(log.startTime);
@@ -261,7 +251,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     }],
   }), [last7DaysData]);
 
-  // IMPROVED: Temperature Drop with real-time data and proper sorting
+  // Temperature Drop
   const tempDropData = useMemo(() => ({
     labels: last10EventsData.map((log) => {
       const date = new Date(log.startTime);
@@ -280,7 +270,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     }],
   }), [last10EventsData]);
 
-  // Peak Heat Alerts Counter - MEMOIZED
+  // Peak Heat Alerts Counter
   const alerts = useMemo(() => ({
     warning: filteredLogs.filter(log => log.startTemperature >= 30 && log.startTemperature < 35).length,
     danger: filteredLogs.filter(log => log.startTemperature >= 35).length,
@@ -291,9 +281,11 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     ? Math.round((alerts.safe / filteredLogs.length) * 100)
     : 0;
 
-  // Get latest log timestamp - MEMOIZED
+  // Get latest log timestamp
   const lastUpdated = useMemo(() => {
-    const logsWithTime = (logs || []).filter(l => l && l.startTime);
+    // ✅ SAFETY CHECK
+    const safeLogs = Array.isArray(logs) ? logs : [];
+    const logsWithTime = safeLogs.filter(l => l && l.startTime);
     if (logsWithTime.length === 0) return 'No data';
 
     const latestLog = logsWithTime.reduce((a, b) =>
@@ -305,7 +297,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
 
   return (
     <div className="space-y-6">
-      {/* Filter Controls with Last Updated indicator */}
+      {/* Filter Controls */}
       <div className="flex gap-4 items-center bg-gray-700 p-4 rounded-lg">
         <span className="text-gray-300 font-semibold">Filter Analytics:</span>
         <select
@@ -348,26 +340,26 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
 
       {/* Row 1: Comfort Gauge & Water Usage */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* A. Comfort Gauge - NOW SHOWS DATA WITH PERCENTAGES */}
-<div className="bg-gray-700 p-6 rounded-lg shadow-md">
-  <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Livestock Comfort Index</h3>
-  <div className="h-64 relative">
-    {comfort.totalLogs > 0 ? (
-      <>
-        <div className="w-full h-full flex items-center justify-center">
-          <Doughnut data={comfortData} options={doughnutOptions} />
-        </div>
-        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
-          <div className="text-center" style={{ marginTop: '-30px' }}>
-            <div className="text-3xl font-bold text-white">{comfort.totalLogs}</div>
-            <div className="text-xs text-gray-400">Total Events</div>
+        {/* A. Comfort Gauge */}
+        <div className="bg-gray-700 p-6 rounded-lg shadow-md">
+          <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Livestock Comfort Index</h3>
+          <div className="h-64 relative">
+            {comfort.totalLogs > 0 ? (
+              <>
+                <div className="w-full h-full flex items-center justify-center">
+                  <Doughnut data={comfortData} options={doughnutOptions} />
+                </div>
+                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
+                  <div className="text-center" style={{ marginTop: '-30px' }}>
+                    <div className="text-3xl font-bold text-white">{comfort.totalLogs}</div>
+                    <div className="text-xs text-gray-400">Total Events</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">No data available</div>
+            )}
           </div>
-        </div>
-      </>
-    ) : (
-      <div className="h-full flex items-center justify-center text-gray-400">No data available</div>
-    )}
-  </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
             <div className="bg-green-600/20 p-2 rounded border border-green-600">
               <p className="text-green-400 font-bold text-lg">{comfort.safe}%</p>
@@ -387,7 +379,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
           </div>
         </div>
 
-        {/* B. Water Usage - UPDATED WITH REAL-TIME SYNC */}
+        {/* B. Water Usage */}
         <div className="bg-gray-700 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">💧 Water Usage (Last 7 Days)</h3>
           <div className="h-64">
@@ -407,7 +399,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
 
       {/* Row 2: Efficiency & Temp Drop */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* C. Efficiency Score - UPDATED WITH REAL-TIME SYNC */}
+        {/* C. Efficiency Score */}
         <div className="bg-gray-700 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">⚡ Misting System Efficiency</h3>
           <div className="h-64">
@@ -424,7 +416,7 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
           </p>
         </div>
 
-        {/* D. Temperature Drop - UPDATED WITH REAL-TIME SYNC */}
+        {/* D. Temperature Drop */}
         <div className="bg-gray-700 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">🌡️ Temperature Drop (Last 10 Events)</h3>
           <div className="h-64">

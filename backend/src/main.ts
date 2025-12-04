@@ -5,11 +5,15 @@ import bonjour from 'bonjour';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  // ✅ ADD THIS LINE to enable /api prefix
+  app.setGlobalPrefix('api');
+  
   // Allow CORS from any origin for local/LAN testing
   app.enableCors({
     origin: true,
     credentials: true,
   });
+  
   const port = Number(process.env.PORT) || 8081;
   
   // Bind to 0.0.0.0 so server is reachable from other devices on LAN
@@ -17,6 +21,7 @@ async function bootstrap() {
   
   console.log(`\n======================================`);
   console.log(`Backend server is running on http://0.0.0.0:${port}`);
+  console.log(`✓ API routes available at: http://0.0.0.0:${port}/api/*`);
   console.log(`======================================\n`);
   
   // Start mDNS/Bonjour service for automatic discovery

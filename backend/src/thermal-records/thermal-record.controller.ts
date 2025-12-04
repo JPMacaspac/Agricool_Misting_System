@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { ThermalRecordService } from './thermal-record.service';
 
-@Controller('api/thermal')
+@Controller('thermal')
 export class ThermalRecordController {
   constructor(private readonly thermalRecordService: ThermalRecordService) {}
 

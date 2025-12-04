@@ -11,6 +11,7 @@ import { Notification } from './notifications/notification.entity';
 import { ThermalRecordModule } from './thermal-records/thermal-record.module';
 import { ThermalRecord } from './thermal-records/thermal-record.entity';
 import { PigModule } from './pigs/pig.module';
+import { Pig } from './pigs/pig.entity';  // ✅ ADD THIS
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { PigModule } from './pigs/pig.module';
       username: 'root',
       password: '',
       database: 'agricooldb',
-      entities: [User, Sensor, MistingLog, Notification, ThermalRecord],
+      entities: [User, Sensor, MistingLog, Notification, ThermalRecord, Pig],  // ✅ ADD Pig HERE
       synchronize: true,
     }),
     UsersModule,

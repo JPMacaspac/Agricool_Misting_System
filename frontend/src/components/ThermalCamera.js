@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function ThermalCamera({ espIp = "192.168.56.3" }) {
+export default function ThermalCamera({ espIp = "192.168.1.3" }) {
   const canvasRef = useRef(null);
   const [thermalData, setThermalData] = useState(null);
+  const [statusData, setStatusData] = useState(null);
   const [error, setError] = useState(null);
 
+  // Fetch thermal frame data
   useEffect(() => {
     const fetchThermalData = async () => {
       try {
         const response = await fetch(`http://${espIp}/thermal/frame`);
-        if (!response.ok) throw new Error('Failed to fetch');
+        if (!response.ok) throw new Error('Failed to fetch thermal');
         const data = await response.json();
         setThermalData(data);
         setError(null);
@@ -20,6 +22,25 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
 
     const interval = setInterval(fetchThermalData, 500);
     fetchThermalData();
+
+    return () => clearInterval(interval);
+  }, [espIp]);
+
+  // Fetch status data (includes pig info)
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch(`http://${espIp}/status`);
+        if (!response.ok) throw new Error('Failed to fetch status');
+        const data = await response.json();
+        setStatusData(data);
+      } catch (err) {
+        console.error('Status fetch error:', err);
+      }
+    };
+
+    const interval = setInterval(fetchStatus, 1000);
+    fetchStatus();
 
     return () => clearInterval(interval);
   }, [espIp]);
@@ -47,7 +68,7 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
     if (thermalData.pigPresent) {
       const hotPixels = [];
       for (let i = 0; i < thermalData.pixels.length; i++) {
-        if (thermalData.pixels[i] >= 35) {
+        if (thermalData.pixels[i] >= 28) { // Lower threshold to detect body temp
           hotPixels.push({
             x: i % 32,
             y: Math.floor(i / 32)
@@ -75,7 +96,7 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
         ctx.fillStyle = '#00FF00';
         ctx.font = 'bold 16px Arial';
         ctx.fillText(
-          thermalData.pigName || 'Unknown Pig',
+          thermalData.pigName || thermalData.pigRFID || 'Pig Detected',
           minX * cellW + 5,
           minY * cellH - 5
         );
@@ -95,6 +116,7 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
     if (status === 'FEVER!') return 'text-red-500';
     if (status === 'Elevated') return 'text-yellow-500';
     if (status === 'Normal') return 'text-green-500';
+    if (status === 'Low') return 'text-blue-400';
     return 'text-gray-400';
   };
 
@@ -113,6 +135,11 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
       </div>
     );
   }
+
+  // Use statusData for pig detection status
+  const pigPresent = thermalData.pigPresent;
+  const pigRFID = thermalData.pigRFID;
+  const pigName = thermalData.pigName;
 
   return (
     <div className="bg-gray-700 rounded-lg p-6 shadow-lg">
@@ -161,19 +188,19 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
               <div className="flex justify-between">
                 <span className="text-gray-400">Max:</span>
                 <span className="font-bold text-red-400">
-                  {thermalData.maxTemp.toFixed(1)}°C
+                  {thermalData.maxTemp?.toFixed(1) || '--'}°C
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Avg:</span>
                 <span className="font-bold text-yellow-400">
-                  {thermalData.avgTemp.toFixed(1)}°C
+                  {thermalData.avgTemp?.toFixed(1) || '--'}°C
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Min:</span>
                 <span className="font-bold text-blue-400">
-                  {thermalData.minTemp.toFixed(1)}°C
+                  {thermalData.minTemp?.toFixed(1) || '--'}°C
                 </span>
               </div>
             </div>
@@ -182,27 +209,47 @@ export default function ThermalCamera({ espIp = "192.168.56.3" }) {
           <div className="bg-gray-800 p-4 rounded-lg">
             <h4 className="font-bold text-[#A1F1FA] mb-2">Status</h4>
             <p className={`text-2xl font-bold ${getStatusColor(thermalData.status)}`}>
-              {thermalData.status}
+              {thermalData.status || 'No Data'}
             </p>
           </div>
 
-          {thermalData.pigPresent && thermalData.pigRFID && (
+          {pigPresent && pigRFID ? (
             <div className="bg-blue-900/30 border-2 border-blue-500 p-4 rounded-lg">
               <h4 className="font-bold text-blue-400 mb-2">🐷 Pig Detected</h4>
-              <p className="font-bold text-lg">{thermalData.pigName || 'Unknown'}</p>
-              <p className="text-xs text-gray-400">RFID: {thermalData.pigRFID}</p>
+              <p className="font-bold text-lg">
+                {pigName || 'Unknown Pig'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">RFID: {pigRFID}</p>
               <p className="text-sm mt-2">
                 Body Temp: <span className="font-bold text-red-400">
-                  {thermalData.maxTemp.toFixed(1)}°C
+                  {thermalData.maxTemp?.toFixed(1) || '--'}°C
                 </span>
               </p>
+              <p className={`text-xs mt-1 ${getStatusColor(thermalData.status)}`}>
+                {thermalData.status}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <p className="text-gray-400 text-sm">No pig detected</p>
+              <p className="text-xs text-gray-500 mt-1">Scan RFID tag to identify pig</p>
             </div>
           )}
 
-          {!thermalData.pigPresent && (
-            <div className="bg-gray-800 p-4 rounded-lg text-center">
-              <p className="text-gray-400 text-sm">No pig detected</p>
-              <p className="text-xs text-gray-500 mt-1">Scan RFID tag</p>
+          {statusData && (
+            <div className="bg-gray-800 p-3 rounded-lg text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Ambient Temp:</span>
+                <span>{statusData.temperature?.toFixed(1)}°C</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Humidity:</span>
+                <span>{statusData.humidity?.toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Water Level:</span>
+                <span>{statusData.waterLevel}%</span>
+              </div>
             </div>
           )}
         </div>

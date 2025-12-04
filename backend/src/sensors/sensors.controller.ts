@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Body, Param, Req, Res } from '@nestjs/commo
 import type { Request, Response } from 'express';
 import { SensorsService } from './sensors.service';
 import { MqttService } from '../mqtt.service';
-import { NotificationService } from '../notifications/notification.service'; // ADD THIS
+import { NotificationService } from '../notifications/notification.service';
 import { ThermalRecordService } from '../thermal-records/thermal-record.service';
 
 interface SensorDataDto {
@@ -10,11 +10,11 @@ interface SensorDataDto {
   humidity: number;
   waterLevel: number;
   pumpStatus: boolean;
-  manualMode?: boolean; // ADD THIS
-  pigBodyTemp?: number;      // ADD THESE
-  pigMinTemp?: number;        // ADD THESE
-  pigAvgTemp?: number;        // ADD THESE
-  pigTempValid?: boolean;     // ADD THESE
+  manualMode?: boolean;
+  pigBodyTemp?: number;
+  pigMinTemp?: number;
+  pigAvgTemp?: number;
+  pigTempValid?: boolean;
 }
 
 interface MistingStartDto {
@@ -31,64 +31,64 @@ interface MistingEndDto {
   waterLevel: number;
 }
 
-@Controller('api/sensors')
+@Controller('sensors')  // ✅ FIXED: Removed 'api/'
 export class SensorsController {
-  private previousPumpStatus: boolean = false; // ADD THIS
-  private currentMode: string = 'AUTO'; // ADD THIS
+  private previousPumpStatus: boolean = false;
+  private currentMode: string = 'AUTO';
 
   constructor(
     private readonly sensorsService: SensorsService,
     private readonly mqttService: MqttService,
-    private readonly notificationService: NotificationService, // ADD THIS
+    private readonly notificationService: NotificationService,
     private readonly thermalRecordService: ThermalRecordService,
   ) {}
 
-@Post()
-async create(@Body() createSensorDto: {
-  temperature: number;
-  humidity: number;
-  waterLevel: number;
-  pumpStatus: boolean;
-  manualMode?: boolean;
-  pigBodyTemp?: number;
-  pigMinTemp?: number;
-  pigAvgTemp?: number;
-  pigTempValid?: boolean;
-}) {
-  console.log('Received sensor data:', createSensorDto);
-  
-  // Save sensor data (existing)
-  const sensor = await this.sensorsService.create({
-    temperature: createSensorDto.temperature,
-    humidity: createSensorDto.humidity,
-    waterLevel: createSensorDto.waterLevel,
-    pumpStatus: createSensorDto.pumpStatus,
-    manualMode: createSensorDto.manualMode,
-  });
+  @Post()
+  async create(@Body() createSensorDto: {
+    temperature: number;
+    humidity: number;
+    waterLevel: number;
+    pumpStatus: boolean;
+    manualMode?: boolean;
+    pigBodyTemp?: number;
+    pigMinTemp?: number;
+    pigAvgTemp?: number;
+    pigTempValid?: boolean;
+  }) {
+    console.log('Received sensor data:', createSensorDto);
+    
+    // Save sensor data
+    const sensor = await this.sensorsService.create({
+      temperature: createSensorDto.temperature,
+      humidity: createSensorDto.humidity,
+      waterLevel: createSensorDto.waterLevel,
+      pumpStatus: createSensorDto.pumpStatus,
+      manualMode: createSensorDto.manualMode,
+    });
 
-  // Track misting type based on manualMode flag
-  if (createSensorDto.manualMode !== undefined) {
-    this.currentMode = createSensorDto.manualMode ? 'MANUAL' : 'AUTO';
-  }
-
-  // Save thermal data if valid
-  if (createSensorDto.pigTempValid && createSensorDto.pigAvgTemp) {
-    try {
-      await this.thermalRecordService.create({
-        maxTemp: createSensorDto.pigBodyTemp,
-        minTemp: createSensorDto.pigMinTemp,
-        avgTemp: createSensorDto.pigAvgTemp,
-      });
-    } catch (error) {
-      console.error('Error saving thermal record:', error);
+    // Track misting type based on manualMode flag
+    if (createSensorDto.manualMode !== undefined) {
+      this.currentMode = createSensorDto.manualMode ? 'MANUAL' : 'AUTO';
     }
-  }
 
-  // Check for pump status changes and create notifications
-  await this.checkPumpStatusChange(sensor);
-  
-  return { success: true, data: sensor };
-}
+    // Save thermal data if valid
+    if (createSensorDto.pigTempValid && createSensorDto.pigAvgTemp) {
+      try {
+        await this.thermalRecordService.create({
+          maxTemp: createSensorDto.pigBodyTemp,
+          minTemp: createSensorDto.pigMinTemp,
+          avgTemp: createSensorDto.pigAvgTemp,
+        });
+      } catch (error) {
+        console.error('Error saving thermal record:', error);
+      }
+    }
+
+    // Check for pump status changes and create notifications
+    await this.checkPumpStatusChange(sensor);
+    
+    return { success: true, data: sensor };
+  }
 
   @Get()
   findAll() {
@@ -105,16 +105,13 @@ async create(@Body() createSensorDto: {
     return this.sensorsService.findAll();
   }
 
-  // ✅ UPDATED: Pump control with MQTT + Notifications
   @Post('pump/manual')
   async manualPumpControl(@Body() body: { action: 'on' | 'off' }) {
     console.log(`📱 Manual pump control: ${body.action}`);
 
-    // Publish to MQTT
     const command = body.action === 'on' ? 'MANUAL_ON' : 'MANUAL_OFF';
     this.mqttService.publish('agricool/pump/command', command);
 
-    // ✅ ADD: Create notification for manual control
     const latest = await this.sensorsService.findLatest();
     if (latest) {
       this.currentMode = 'MANUAL';
@@ -127,8 +124,6 @@ async create(@Body() createSensorDto: {
         pumpStatus: body.action === 'on',
         mode: 'MANUAL',
       });
-      // Sync previous pump status so the incoming sensor POST won't
-      // immediately generate a duplicate notification for the same change.
       this.previousPumpStatus = body.action === 'on';
     }
 
@@ -143,10 +138,8 @@ async create(@Body() createSensorDto: {
   async switchToAutoMode() {
     console.log('🤖 Switching to AUTO mode');
 
-    // Publish to MQTT
     this.mqttService.publish('agricool/pump/command', 'AUTO_MODE');
 
-    // ✅ ADD: Create notification for mode change
     const latest = await this.sensorsService.findLatest();
     if (latest) {
       this.currentMode = 'AUTO';
@@ -159,8 +152,6 @@ async create(@Body() createSensorDto: {
         pumpStatus: latest.pumpStatus,
         mode: 'AUTO',
       });
-      // Keep previousPumpStatus in sync with current sensor value to
-      // avoid duplicate notifications when the sensor update arrives.
       this.previousPumpStatus = latest.pumpStatus;
     }
 
@@ -169,8 +160,6 @@ async create(@Body() createSensorDto: {
       message: 'Switched to AUTO mode',
     };
   }
-
-  
 
   @Get('stream')
   async stream(@Req() req: Request, @Res() res: Response) {
@@ -185,10 +174,6 @@ async create(@Body() createSensorDto: {
 
     const onData = async (data: any) => {
       try {
-        // Streaming should only forward data to clients.
-        // Pump status change checks are performed when sensor POSTs arrive
-        // (in the create() handler) to avoid duplicate notifications
-        // when SSE listeners are connected.
         res.write(`data: ${JSON.stringify(data)}\n\n`);
       } catch (e) {
         // ignore
@@ -204,11 +189,9 @@ async create(@Body() createSensorDto: {
     return res;
   }
 
-  // ✅ ADD THIS NEW METHOD: Check for pump status changes
   private async checkPumpStatusChange(sensor: any) {
     const currentStatus = sensor.pumpStatus;
 
-    // Only create notification if status actually changed
     if (currentStatus !== this.previousPumpStatus) {
       const notificationType = currentStatus ? 'PUMP_ON' : 'PUMP_OFF';
       const statusText = currentStatus ? 'ON' : 'OFF';
@@ -228,7 +211,7 @@ async create(@Body() createSensorDto: {
   }
 }
 
-@Controller('api/misting')
+@Controller('misting')  // ✅ FIXED: Removed 'api/'
 export class MistingController {
   constructor(private readonly sensorsService: SensorsService) {}
 
