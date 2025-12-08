@@ -15,7 +15,9 @@ export default function SignupPage() {
   const handleSignup = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:8081/signup", { name, email, password });
+      // ✅ FIXED: Added /api prefix
+      const res = await axios.post("http://localhost:8081/api/signup", { name, email, password });
+      
       if (res.data && res.data.user) {
         alert("Account created successfully!");
         navigate("/");

@@ -14,7 +14,9 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:8081/login", { email, password });
+      // ✅ FIXED: Added /api prefix
+      const res = await axios.post("http://localhost:8081/api/login", { email, password });
+      
       if (!res.data.user) {
         if (res.data.message && res.data.message.toLowerCase().includes("email")) {
           alert("There is no existing account for this email.");
@@ -23,12 +25,13 @@ export default function LoginPage() {
         }
         return;
       }
-  localStorage.setItem("token", res.data.token || "");
-  localStorage.setItem("userName", res.data.user.fullname);
-  // store id and email so other pages can fetch latest user info from backend
-  if (res.data.user.id) localStorage.setItem("userId", String(res.data.user.id));
-  if (res.data.user.email) localStorage.setItem("userEmail", res.data.user.email);
-  if (res.data.user.role) localStorage.setItem("userRole", res.data.user.role);
+      
+      localStorage.setItem("token", res.data.token || "");
+      localStorage.setItem("userName", res.data.user.fullname);
+      if (res.data.user.id) localStorage.setItem("userId", String(res.data.user.id));
+      if (res.data.user.email) localStorage.setItem("userEmail", res.data.user.email);
+      if (res.data.user.role) localStorage.setItem("userRole", res.data.user.role);
+      
       navigate("/dashboard");
     } catch (err) {
       const msg = err.response?.data?.message || "Invalid credentials";
@@ -80,7 +83,7 @@ export default function LoginPage() {
           </button>
 
           <p className="text-sm text-center mt-4">
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <span
               className="text-blue-400 cursor-pointer hover:underline"
               onClick={() => navigate("/signup")}

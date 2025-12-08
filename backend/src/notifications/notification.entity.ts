@@ -6,7 +6,10 @@ export class Notification {
   id: number;
 
   @Column()
-  type: string; // 'PUMP_ON' | 'PUMP_OFF' | 'MANUAL_ON' | 'MANUAL_OFF' | 'AUTO_MODE'
+  type: string; // 'PUMP_ON' | 'PUMP_OFF' | 'MANUAL_ON' | 'MANUAL_OFF' | 'AUTO_MODE' | 'high_temp' | 'elevated_temp'
+
+  @Column({ nullable: true }) // NEW: Add title field
+  title: string;
 
   @Column()
   message: string;
@@ -24,7 +27,7 @@ export class Notification {
   pumpStatus: boolean;
 
   @Column()
-  mode: string; // 'MANUAL' | 'AUTO'
+  mode: string; // 'MANUAL' | 'AUTO' | 'thermal'
 
   @Column({ default: false })
   isRead: boolean;

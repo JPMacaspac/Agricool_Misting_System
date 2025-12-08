@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ThermalCamera from '../components/ThermalCamera';
+import NotificationPanel from '../components/NotificationPanel';
 import { useNavigate } from 'react-router-dom';
 import {
   FaChartBar,
@@ -13,6 +14,7 @@ import {
 } from 'react-icons/fa';
 
 const API_URL = 'http://localhost:8081/api/thermal';
+const API_BASE = 'http://localhost:8081';
 
 export default function Records() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -147,6 +149,9 @@ export default function Records() {
         <h1 className="text-xl font-bold">AgriCool</h1>
 
         <div className="flex items-center gap-4">
+          {/* Notification Panel - THIS WAS MISSING! */}
+          <NotificationPanel apiBase={API_BASE} />
+
           {/* User Menu */}
           <div className="relative">
             <div
@@ -251,7 +256,7 @@ export default function Records() {
             </div>
 
             <div className="mb-6">
-              <ThermalCamera espIp="192.168.1.3" />
+              <ThermalCamera espIp="192.168.1.3" apiBase={API_BASE} />
             </div>
 
             {/* Search and Filters */}

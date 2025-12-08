@@ -1,10 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function ThermalCamera({ espIp = "192.168.1.3" }) {
+export default function ThermalCamera({ espIp = "192.168.1.3", apiBase = "http://localhost:8081" }) {
   const canvasRef = useRef(null);
   const [thermalData, setThermalData] = useState(null);
   const [statusData, setStatusData] = useState(null);
   const [error, setError] = useState(null);
+  const [lastNotificationTemp, setLastNotificationTemp] = useState(null);
+  const [lastNotificationTime, setLastNotificationTime] = useState(0);
+
+  // Send notification to backend
+  const sendNotification = async (type, title, message) => {
+    try {
+      await fetch(`${apiBase}/api/notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type,
+          title,
+          message,
+        }),
+      });
+      console.log(`📢 Notification sent: ${title}`);
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+    }
+  };
 
   // Fetch thermal frame data
   useEffect(() => {
@@ -44,6 +66,43 @@ export default function ThermalCamera({ espIp = "192.168.1.3" }) {
 
     return () => clearInterval(interval);
   }, [espIp]);
+
+  // Check temperature and send notifications
+  useEffect(() => {
+    if (!thermalData || !thermalData.maxTemp) return;
+
+    const maxTemp = thermalData.maxTemp;
+    const pigInfo = thermalData.pigName || thermalData.pigRFID || 'Unknown Pig';
+    const now = Date.now();
+    
+    // Prevent duplicate notifications within 5 minutes (300000ms)
+    const notificationCooldown = 300000;
+    
+    if (now - lastNotificationTime < notificationCooldown && lastNotificationTemp === Math.floor(maxTemp)) {
+      return;
+    }
+
+    // Very Hot (≥38°C) - Critical Alert
+    if (maxTemp >= 38.0) {
+      sendNotification(
+        'high_temp',
+        '🔥 Critical Temperature Alert',
+        `${pigInfo} has a very high temperature of ${maxTemp.toFixed(1)}°C (≥38°C). Immediate attention required!`
+      );
+      setLastNotificationTemp(Math.floor(maxTemp));
+      setLastNotificationTime(now);
+    }
+    // Hot (35-38°C) - Warning
+    else if (maxTemp >= 35.0 && maxTemp < 38.0) {
+      sendNotification(
+        'high_temp',
+        '🌡️ Elevated Temperature Warning',
+        `${pigInfo} has an elevated temperature of ${maxTemp.toFixed(1)}°C (35-38°C). Monitor closely.`
+      );
+      setLastNotificationTemp(Math.floor(maxTemp));
+      setLastNotificationTime(now);
+    }
+  }, [thermalData, apiBase, lastNotificationTemp, lastNotificationTime]);
 
   useEffect(() => {
     if (!thermalData || !canvasRef.current) return;

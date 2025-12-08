@@ -23,6 +23,27 @@ export class NotificationService {
     return await this.notificationRepository.save(notification);
   }
 
+  // NEW: Method specifically for thermal notifications
+  async createThermalNotification(data: {
+    type: string;
+    title: string;
+    message: string;
+    temperature: number;
+  }): Promise<Notification> {
+    const notification = this.notificationRepository.create({
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      temperature: data.temperature,
+      humidity: 0, // Not applicable for thermal notifications
+      waterLevel: 0, // Not applicable for thermal notifications
+      pumpStatus: false,
+      mode: 'thermal',
+      isRead: false,
+    });
+    return await this.notificationRepository.save(notification);
+  }
+
   async getAllNotifications(limit: number = 50): Promise<Notification[]> {
     return await this.notificationRepository.find({
       order: { createdAt: 'DESC' },
