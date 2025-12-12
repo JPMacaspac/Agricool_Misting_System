@@ -269,12 +269,19 @@ export default function Records() {
 
             {/* Info Banner */}
             <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4 mb-6">
-              <p className="text-blue-300 font-semibold">📡 ESP32 Thermal Camera Active</p>
-              <p className="text-gray-400 text-sm mt-1">Auto-scanning every 15 seconds. Data refreshes automatically.</p>
+              <p className="text-blue-300 font-semibold">📡 Live Thermal Camera Feed</p>
+              <p className="text-gray-400 text-sm mt-1">Real-time thermal imaging from ESP32. Make sure your ESP32 is connected to the network.</p>
             </div>
 
+            {/* Live Thermal Camera Feed */}
             <div className="mb-6">
-              <ThermalCamera espIp="192.168.1.3" apiBase={API_BASE} />
+              <ThermalCamera espIp="192.168.1.23" apiBase={API_BASE} />
+            </div>
+
+            {/* Historical Records Section */}
+            <div className="bg-green-900/20 border border-green-500 rounded-lg p-4 mb-6">
+              <p className="text-green-300 font-semibold">📊 Historical Thermal Records</p>
+              <p className="text-gray-400 text-sm mt-1">{pigRecords.length} thermal scans stored in database. Showing 5 records per page.</p>
             </div>
 
             {/* Search and Filters */}

@@ -94,11 +94,14 @@ const formattedRecords = records.map(record => ({
   date: new Date(record.scannedAt).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    timeZone: 'Asia/Manila'
   }),
   time: new Date(record.scannedAt).toLocaleTimeString('en-US', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Manila'
   })
 }));
 
