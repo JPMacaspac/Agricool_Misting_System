@@ -72,17 +72,26 @@ export class SensorsController {
     }
 
     // Save thermal data if valid
-    if (createSensorDto.pigTempValid && createSensorDto.pigAvgTemp) {
-      try {
-        await this.thermalRecordService.create({
-          maxTemp: createSensorDto.pigBodyTemp,
-          minTemp: createSensorDto.pigMinTemp,
-          avgTemp: createSensorDto.pigAvgTemp,
-        });
-      } catch (error) {
-        console.error('Error saving thermal record:', error);
-      }
-    }
+// Save thermal data if valid
+// Save thermal data if valid
+if (createSensorDto.pigTempValid && createSensorDto.pigBodyTemp) {
+  try {
+    await this.thermalRecordService.createRecord({
+      name: 'Auto-detected Pig', // ✅ ADD THIS - Required field!
+      rfidUID: 'AUTO_DETECTED',
+      bodyTemp: createSensorDto.pigBodyTemp,
+      minTemp: createSensorDto.pigMinTemp || createSensorDto.pigBodyTemp,
+      avgTemp: createSensorDto.pigAvgTemp || createSensorDto.pigBodyTemp,
+      tempStatus: this.getTempStatus(createSensorDto.pigBodyTemp),
+      ambientTemp: createSensorDto.temperature,
+      ambientHumidity: createSensorDto.humidity,
+      healthStatus: this.getTempStatus(createSensorDto.pigBodyTemp), // ✅ ADD THIS if needed
+    });
+    console.log('✅ Auto-saved thermal record from sensor data');
+  } catch (error) {
+    console.error('❌ Error saving thermal record:', error);
+  }
+}
 
     // Check for pump status changes and create notifications
     await this.checkPumpStatusChange(sensor);
@@ -189,7 +198,7 @@ export class SensorsController {
     return res;
   }
 
-  private async checkPumpStatusChange(sensor: any) {
+private async checkPumpStatusChange(sensor: any) {
     const currentStatus = sensor.pumpStatus;
 
     if (currentStatus !== this.previousPumpStatus) {
@@ -208,6 +217,14 @@ export class SensorsController {
 
       this.previousPumpStatus = currentStatus;
     }
+  }
+
+  // ✅ ADD THIS METHOD HERE
+  private getTempStatus(temp: number): string {
+    if (temp >= 40.0) return 'Fever Alert';
+    if (temp >= 39.5) return 'Elevated';
+    if (temp >= 38.0) return 'Normal';
+    return 'Low Temp';
   }
 }
 

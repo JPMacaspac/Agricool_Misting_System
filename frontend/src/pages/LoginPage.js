@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import bg from "../bg.jpg";
 import logo from "../logo.svg";
 
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       // ✅ FIXED: Added /api prefix
-      const res = await axios.post("http://localhost:8081/api/login", { email, password });
+      const res = await axios.post(`${API_BASE}/api/login`, { email, password });
       
       if (!res.data.user) {
         if (res.data.message && res.data.message.toLowerCase().includes("email")) {

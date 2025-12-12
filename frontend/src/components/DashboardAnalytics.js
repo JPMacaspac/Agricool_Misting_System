@@ -184,35 +184,35 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
     }],
   };
 
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '60%',
-    plugins: {
-      legend: {
-        labels: {
-          color: '#cbd5e1',
-          font: { size: 12 },
-          padding: 15
-        },
-        position: 'bottom',
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '75%', // ✅ Slightly bigger cutout for centered text
+  plugins: {
+    legend: {
+      labels: {
+        color: '#cbd5e1',
+        font: { size: 10 }, // ✅ Smaller font for mobile
+        padding: 10
       },
-      tooltip: {
-        enabled: true,
-        callbacks: {
-          label: function (context) {
-            const label = context.label || '';
-            const value = context.parsed || 0;
-            let count = 0;
-            if (context.dataIndex === 0) count = comfort.safeCount;
-            if (context.dataIndex === 1) count = comfort.warningCount;
-            if (context.dataIndex === 2) count = comfort.dangerCount;
-            return `${label}: ${value}% (${count} events)`;
-          }
+      position: 'bottom',
+    },
+    tooltip: {
+      enabled: true,
+      callbacks: {
+        label: function (context) {
+          const label = context.label || '';
+          const value = context.parsed || 0;
+          let count = 0;
+          if (context.dataIndex === 0) count = comfort.safeCount;
+          if (context.dataIndex === 1) count = comfort.warningCount;
+          if (context.dataIndex === 2) count = comfort.dangerCount;
+          return `${label}: ${value}% (${count} events)`;
         }
       }
-    },
-  };
+    }
+  },
+};
 
   // Water Usage
   const waterUsageData = useMemo(() => ({
@@ -341,43 +341,67 @@ export default function DashboardAnalytics({ apiBase, sensorData }) {
       {/* Row 1: Comfort Gauge & Water Usage */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* A. Comfort Gauge */}
-        <div className="bg-gray-700 p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Livestock Comfort Index</h3>
-          <div className="h-64 relative">
-            {comfort.totalLogs > 0 ? (
-              <>
-                <div className="w-full h-full flex items-center justify-center">
-                  <Doughnut data={comfortData} options={doughnutOptions} />
-                </div>
-                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
-                  <div className="text-center" style={{ marginTop: '-30px' }}>
-                    <div className="text-3xl font-bold text-white">{comfort.totalLogs}</div>
-                    <div className="text-xs text-gray-400">Total Events</div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">No data available</div>
-            )}
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-green-600/20 p-2 rounded border border-green-600">
-              <p className="text-green-400 font-bold text-lg">{comfort.safe}%</p>
-              <p className="text-green-400 font-semibold">{comfort.safeCount}</p>
-              <p className="text-gray-400">Safe Events</p>
-            </div>
-            <div className="bg-yellow-600/20 p-2 rounded border border-yellow-600">
-              <p className="text-yellow-400 font-bold text-lg">{comfort.warning}%</p>
-              <p className="text-yellow-400 font-semibold">{comfort.warningCount}</p>
-              <p className="text-gray-400">Warning Events</p>
-            </div>
-            <div className="bg-red-600/20 p-2 rounded border border-red-600">
-              <p className="text-red-400 font-bold text-lg">{comfort.danger}%</p>
-              <p className="text-red-400 font-semibold">{comfort.dangerCount}</p>
-              <p className="text-gray-400">Danger Events</p>
-            </div>
+{/* A. Comfort Gauge */}
+<div className="bg-gray-700 p-3 sm:p-6 rounded-lg shadow-md">
+  <h3 className="text-base sm:text-lg font-semibold text-[#A1F1FA] mb-3 sm:mb-4">Livestock Comfort Index</h3>
+  <div className="h-64 relative">
+    {comfort.totalLogs > 0 ? (
+      <>
+        <div className="w-full h-full flex items-center justify-center">
+          <Doughnut data={comfortData} options={doughnutOptions} />
+        </div>
+        {/* ✅ FIXED: Centered text inside chart */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center" style={{ marginBottom: '40px' }}>
+            <div className="text-3xl sm:text-4xl font-bold text-white">{comfort.totalLogs}</div>
+            <div className="text-xs text-gray-400 mt-1">Total Events</div>
           </div>
         </div>
+      </>
+    ) : (
+      <div className="h-full flex items-center justify-center text-gray-400">No data available</div>
+    )}
+  </div>
+  
+  {/* ✅ FIXED: Three horizontal rectangles like image 3 */}
+  <div className="mt-4 space-y-2">
+    {/* Safe Events - Green */}
+    <div className="bg-green-600/20 p-3 rounded-lg border-l-4 border-green-500 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-4 h-4 bg-green-500 rounded"></div>
+        <span className="text-sm text-gray-300">Safe (&lt;30°C)</span>
+      </div>
+      <div className="text-right">
+        <p className="text-xl font-bold text-green-400">{comfort.safe}%</p>
+        <p className="text-xs text-gray-400">{comfort.safeCount} events</p>
+      </div>
+    </div>
+
+    {/* Warning Events - Yellow */}
+    <div className="bg-yellow-600/20 p-3 rounded-lg border-l-4 border-yellow-500 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+        <span className="text-sm text-gray-300">Warning (30-35°C)</span>
+      </div>
+      <div className="text-right">
+        <p className="text-xl font-bold text-yellow-400">{comfort.warning}%</p>
+        <p className="text-xs text-gray-400">{comfort.warningCount} events</p>
+      </div>
+    </div>
+
+    {/* Danger Events - Red */}
+    <div className="bg-red-600/20 p-3 rounded-lg border-l-4 border-red-500 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-4 h-4 bg-red-500 rounded"></div>
+        <span className="text-sm text-gray-300">Danger (≥35°C)</span>
+      </div>
+      <div className="text-right">
+        <p className="text-xl font-bold text-red-400">{comfort.danger}%</p>
+        <p className="text-xs text-gray-400">{comfort.dangerCount} events</p>
+      </div>
+    </div>
+  </div>
+</div>
 
         {/* B. Water Usage */}
         <div className="bg-gray-700 p-6 rounded-lg shadow-md">

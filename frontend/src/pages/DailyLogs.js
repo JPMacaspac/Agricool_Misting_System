@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar, FaFileAlt } from "react-icons/fa";
+import { FaSearch, FaRegCalendarAlt, FaClipboardList, FaChartBar, FaFileAlt, FaBars, FaChevronUp, FaChevronDown } from "react-icons/fa";
 import NotificationPanel from '../components/NotificationPanel';
 import MistingCharts from '../components/MistingCharts';
 
@@ -70,32 +70,39 @@ export default function DailyLogs() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [bottomNavOpen, setBottomNavOpen] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [profilePicture, setProfilePicture] = useState(localStorage.getItem("profilePicture") || "");
     const rowsPerPage = 20;
 
-    const API_BASE = process.env.REACT_APP_API_URL || "http://192.168.1.16:8081";
-    const userName = localStorage.getItem("userName") || "Jp Macaspac";
+    const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8081";
+    const userName = localStorage.getItem("userName") || "Marc Andrei Toledo";
     const navigate = useNavigate();
 
     // Sync profile picture from localStorage
     useEffect(() => {
-        const handleStorageChange = () => {
-            setProfilePicture(localStorage.getItem("profilePicture") || "");
+        const loadProfilePic = () => {
+            const pic = localStorage.getItem("profilePicture");
+            if (pic !== profilePicture) {
+                setProfilePicture(pic || "");
+            }
         };
 
-        window.addEventListener('storage', handleStorageChange);
+        loadProfilePic();
+        const interval = setInterval(loadProfilePic, 1000);
 
-        const interval = setInterval(() => {
-            const currentPic = localStorage.getItem("profilePicture") || "";
-            if (currentPic !== profilePicture) {
-                setProfilePicture(currentPic);
+        const handleStorage = (e) => {
+            if (e.key === 'profilePicture') {
+                setProfilePicture(e.newValue || "");
             }
-        }, 500);
+        };
+
+        window.addEventListener('storage', handleStorage);
 
         return () => {
-            window.removeEventListener('storage', handleStorageChange);
             clearInterval(interval);
+            window.removeEventListener('storage', handleStorage);
         };
     }, [profilePicture]);
 
@@ -210,36 +217,58 @@ export default function DailyLogs() {
     }, [filtered, currentPage]);
 
     return (
-        <div className="bg-gray-800 h-screen text-white font-sans flex flex-col overflow-hidden">
+        <div className="bg-gray-800 min-h-screen text-white font-sans flex flex-col">
             {/* Fixed Header */}
-            <header className="flex justify-between items-center p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-20">
-                <h1 className="text-xl font-bold">AgriCool</h1>
-
+            <header className="flex justify-between items-center p-3 sm:p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-20">
                 <div className="flex items-center gap-4">
-                    {/* Notification Panel */}
+                    <button
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="hidden md:block p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                        title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                    >
+                        <FaBars className="text-xl text-[#A1F1FA]" />
+                    </button>
+                    <h1 className="text-xl sm:text-2xl font-bold">AgriCool</h1>
+                </div>
+
+                <div className="flex items-center gap-3 sm:gap-4">
                     <NotificationPanel apiBase={API_BASE} />
 
-                    {/* User Menu */}
                     <div className="relative">
                         <div
                             className="flex items-center gap-2 cursor-pointer"
                             onClick={() => setMenuOpen(!menuOpen)}
                         >
-                            <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden border-2 border-gray-500">
                                 {profilePicture ? (
-                                    <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                                    <img
+                                        src={profilePicture}
+                                        alt="Profile"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.style.display = 'none';
+                                            const span = document.createElement('span');
+                                            span.className = 'text-sm font-semibold';
+                                            span.textContent = userName[0];
+                                            e.target.parentElement.appendChild(span);
+                                        }}
+                                    />
                                 ) : (
-                                    <span className="text-xs">{userName[0]}</span>
+                                    <span className="text-sm font-semibold">{userName[0]}</span>
                                 )}
                             </div>
-                            <span className="text-sm">{userName}</span>
+                            <span className="text-sm hidden sm:inline">{userName}</span>
                         </div>
 
                         {menuOpen && (
-                            <div className="absolute right-0 mt-2 w-32 bg-gray-800 rounded-md shadow-lg p-2 z-10">
+                            <div className="absolute right-0 mt-2 w-40 bg-gray-800 rounded-md shadow-lg p-2 z-10 border border-gray-700">
                                 <button
-                                    onClick={() => navigate('/profile')}
-                                    className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded"
+                                    onClick={() => {
+                                        setMenuOpen(false);
+                                        navigate('/profile');
+                                    }}
+                                    className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-sm"
                                 >
                                     Profile
                                 </button>
@@ -248,7 +277,7 @@ export default function DailyLogs() {
                                         localStorage.clear();
                                         window.location.href = "/";
                                     }}
-                                    className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded text-red-400"
+                                    className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-red-400 text-sm"
                                 >
                                     Logout
                                 </button>
@@ -258,49 +287,39 @@ export default function DailyLogs() {
                 </div>
             </header>
 
-            {/* Sidebar + Main Content */}
+            {/* Main Layout */}
             <div className="flex flex-1 overflow-hidden">
-                {/* Fixed Sidebar */}
-                <aside className="bg-gray-900 w-20 flex flex-col items-center p-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0">
+                {/* Desktop Sidebar */}
+                <aside className={`hidden md:flex bg-gray-900 flex-col items-center py-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0 transition-all duration-300 ${sidebarOpen ? 'w-24 px-4' : 'w-0 px-0 border-0 overflow-hidden'
+                    }`}>
                     <button
-                        className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
-                        title="Dashboard"
+                        className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
                         onClick={() => navigate('/dashboard')}
                     >
                         <FaChartBar className="text-2xl" />
                     </button>
-
                     <button
-                        className="text-[#A1F1FA] transition duration-200 bg-gray-800 p-3 rounded-lg border-2 border-[#A1F1FA]"
-                        title="Daily Log"
+                        className="text-[#A1F1FA] bg-gray-800 p-4 rounded-lg border-2 border-[#A1F1FA] w-full flex items-center justify-center"
                         onClick={() => navigate('/daily-logs')}
                     >
                         <FaRegCalendarAlt className="text-2xl" />
                     </button>
-
                     <button
-                        className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
-                        title="Records"
+                        className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
                         onClick={() => navigate('/records')}
                     >
                         <FaClipboardList className="text-2xl" />
                     </button>
-
                     <button
-                        className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
-                        title="Reports"
+                        className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
                         onClick={() => navigate('/reports')}
                     >
                         <FaFileAlt className="text-2xl" />
                     </button>
-
-                    <div className="flex-1"></div>
-
-                    <div className="w-6 h-6 bg-gray-600 rounded-md"></div>
                 </aside>
 
-                {/* Scrollable Main Content */}
-                <main className="flex-1 overflow-y-auto custom-scrollbar">
+                {/* Main Content */}
+                <main className="flex-1 overflow-y-auto pb-4 md:pb-0 custom-scrollbar">
                     <style>{`
                         .custom-scrollbar::-webkit-scrollbar {
                             width: 8px;
@@ -317,8 +336,8 @@ export default function DailyLogs() {
                         }
                     `}</style>
 
-                    <div className="p-6">
-                        <h2 className="text-lg font-semibold mb-6 text-[#A1F1FA]">
+                    <div className="p-3 sm:p-4 md:p-6">
+                        <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-[#A1F1FA]">
                             Misting Event Logs
                         </h2>
 
@@ -338,7 +357,7 @@ export default function DailyLogs() {
                             <select
                                 value={month}
                                 onChange={(e) => setMonth(e.target.value)}
-                                className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm"
+                                className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm text-sm"
                             >
                                 <option>Month</option>
                                 <option>January</option>
@@ -358,7 +377,7 @@ export default function DailyLogs() {
                             <select
                                 value={year}
                                 onChange={(e) => setYear(e.target.value)}
-                                className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm"
+                                className="bg-[#2B3848] px-4 py-2 rounded-md text-gray-200 outline-none shadow-sm text-sm"
                             >
                                 <option>Year</option>
                                 <option>2023</option>
@@ -368,7 +387,7 @@ export default function DailyLogs() {
 
                             <button
                                 onClick={() => window.location.reload()}
-                                className="bg-[#A1F1FA] text-gray-900 px-4 py-2 rounded-md font-semibold hover:bg-[#8DE0EA] transition shadow-sm"
+                                className="bg-[#A1F1FA] text-gray-900 px-4 py-2 rounded-md font-semibold hover:bg-[#8DE0EA] transition shadow-sm text-sm"
                             >
                                 Refresh
                             </button>
@@ -381,7 +400,7 @@ export default function DailyLogs() {
                         )}
 
                         {error && (
-                            <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded-md mb-4">
+                            <div className="bg-red-600/20 border border-red-600 text-red-400 px-4 py-3 rounded-md mb-4 text-sm">
                                 {error}
                             </div>
                         )}
@@ -390,14 +409,14 @@ export default function DailyLogs() {
                         <button
                             onClick={() => setShowCharts(!showCharts)}
                             className="fixed right-0 top-1/2 transform -translate-y-1/2 z-30 bg-[#2B3848] hover:bg-[#3F4D61] 
-               text-white px-3 py-2 rounded-l-lg shadow-lg transition"
+               text-white px-3 py-2 rounded-l-lg shadow-lg transition text-sm"
                         >
                             {showCharts ? '⮜ Hide Charts' : '⮞ Show Charts'}
                         </button>
 
                         {/* Slide-in Charts Panel */}
                         <div
-                            className={`fixed right-0 top-[137px] h-[calc(100vh-137px)] w-[94%] bg-gray-900 shadow-xl z-20 overflow-y-auto custom-scrollbar
+                            className={`fixed right-0 top-[100px] h-[calc(100vh-137px)] w-[100%] bg-gray-900 shadow-xl z-20 overflow-y-auto custom-scrollbar
                 transform transition-transform duration-500 
                 ${showCharts ? 'translate-x-0' : 'translate-x-full'}`}
                         >
@@ -409,8 +428,8 @@ export default function DailyLogs() {
                         {!loading && !error && <LogsTable logs={paginated} />}
 
                         {!loading && !error && (
-                            <div className="flex items-center justify-between mt-4">
-                                <p className="text-gray-400 text-sm">
+                            <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-3">
+                                <p className="text-gray-400 text-xs sm:text-sm">
                                     Showing {filtered.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, filtered.length)} of {filtered.length} filtered ({logs.length} total)
                                 </p>
 
@@ -418,19 +437,19 @@ export default function DailyLogs() {
                                     <button
                                         onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                                         disabled={currentPage === 1}
-                                        className={`px-3 py-1 rounded-md font-semibold ${currentPage === 1 ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
+                                        className={`px-3 py-1 rounded-md font-semibold text-sm ${currentPage === 1 ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
                                     >
                                         Prev
                                     </button>
 
-                                    <div className="text-sm text-gray-300 px-2">
+                                    <div className="text-xs sm:text-sm text-gray-300 px-2">
                                         Page {currentPage} / {totalPages}
                                     </div>
 
                                     <button
                                         onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                                         disabled={currentPage === totalPages}
-                                        className={`px-3 py-1 rounded-md font-semibold ${currentPage === totalPages ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
+                                        className={`px-3 py-1 rounded-md font-semibold text-sm ${currentPage === totalPages ? 'bg-gray-700 text-gray-400' : 'bg-[#A1F1FA] text-gray-900 hover:bg-[#8DE0EA]'}`}
                                     >
                                         Next
                                     </button>
@@ -440,6 +459,52 @@ export default function DailyLogs() {
                     </div>
                 </main>
             </div>
+
+            {/* Mobile Bottom Navigation */}
+            <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-[#A1F1FA] transition-transform duration-300 z-30 ${bottomNavOpen ? 'translate-y-0' : 'translate-y-full'
+                }`}>
+                <button
+                    onClick={() => setBottomNavOpen(!bottomNavOpen)}
+                    className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 p-2 rounded-t-lg border-2 border-b-0 border-[#A1F1FA]"
+                >
+                    {bottomNavOpen ? (
+                        <FaChevronDown className="text-[#A1F1FA]" />
+                    ) : (
+                        <FaChevronUp className="text-[#A1F1FA]" />
+                    )}
+                </button>
+
+                <div className="grid grid-cols-4 gap-2 p-3">
+                    <button
+                        onClick={() => navigate('/dashboard')}
+                        className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+                    >
+                        <FaChartBar className="text-xl" />
+                        <span className="text-xs">Dashboard</span>
+                    </button>
+                    <button
+                        onClick={() => navigate('/daily-logs')}
+                        className="flex flex-col items-center gap-1 p-3 bg-gray-800 rounded-lg border-2 border-[#A1F1FA]"
+                    >
+                        <FaRegCalendarAlt className="text-xl text-[#A1F1FA]" />
+                        <span className="text-xs text-[#A1F1FA]">Daily Log</span>
+                    </button>
+                    <button
+                        onClick={() => navigate('/records')}
+                        className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+                    >
+                        <FaClipboardList className="text-xl" />
+                        <span className="text-xs">Records</span>
+                    </button>
+                    <button
+                        onClick={() => navigate('/reports')}
+                        className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+                    >
+                        <FaFileAlt className="text-xl" />
+                        <span className="text-xs">Reports</span>
+                    </button>
+                </div>
+            </nav>
         </div>
     );
 }

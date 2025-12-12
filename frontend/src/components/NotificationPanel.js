@@ -99,8 +99,8 @@ export default function NotificationPanel({ apiBase }) {
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Panel */}
-          <div className="absolute right-0 mt-2 w-96 bg-gray-800 border-2 border-[#A1F1FA] rounded-lg shadow-2xl z-50 max-h-[80vh] flex flex-col">
+         {/* Panel */}
+          <div className="fixed top-16 right-4 left-20 sm:left-auto sm:right-4 sm:w-96 bg-gray-800 border-2 border-[#A1F1FA] rounded-lg shadow-2xl z-50 max-h-[80vh] flex flex-col">
             {/* Header */}
             <div className="p-4 border-b border-gray-700 flex justify-between items-center">
               <h3 className="text-lg font-bold text-[#A1F1FA]">Notifications</h3>

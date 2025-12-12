@@ -12,6 +12,32 @@ export class ThermalRecordController {
     private readonly notificationService: NotificationService,
   ) {}
 
+  // ✅ NEW: Status endpoint for ESP32 health check
+  @Get('status')
+  getStatus() {
+    return {
+      status: 'online',
+      message: 'Thermal camera API is running',
+      camera: 'MLX90640',
+      connected: true,
+      resolution: { width: 32, height: 24 },
+      fps: 8,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // ✅ NEW: Frame endpoint (ESP32 has the actual thermal data)
+  @Get('frame')
+  getLatestFrame() {
+    return {
+      message: 'Thermal frame data is captured by ESP32 hardware',
+      info: 'ESP32 processes thermal camera locally and sends records to /api/thermal/record',
+      width: 32,
+      height: 24,
+      timestamp: new Date().toISOString()
+    };
+  }
+
   @Get('records')
   async getRecords(
     @Query('search') search?: string,
@@ -21,17 +47,25 @@ export class ThermalRecordController {
     return this.thermalRecordService.getRecords(search, month, year);
   }
 
-  @Post('record')
-  async createRecord(@Body() data: any) {
+@Post('record')
+async createRecord(@Body() data: any) {
+  console.log('📥 Received thermal record data:', data);
+  
+  try {
     // Create the thermal record
     const record = await this.thermalRecordService.createRecord(data);
+    
+    console.log('✅ Thermal record created:', record);
     
     // Check and create notification if needed
     await this.checkAndCreateThermalNotification(record);
     
     return record;
+  } catch (error) {
+    console.error('❌ Error creating thermal record:', error);
+    throw error;
   }
-
+}
   @Post('simulate-scan')
   async simulateScan() {
     const record = await this.thermalRecordService.simulateScan();

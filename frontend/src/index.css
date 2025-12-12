@@ -1,3 +1,364 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================
+   MOBILE RESPONSIVE FIXES FOR AGRICOOL
+   ============================================ */
+
+/* Tablet and Mobile Devices */
+@media (max-width: 768px) {
+  /* Base adjustments */
+  body {
+    font-size: 14px;
+    overflow-x: hidden;
+  }
+
+  /* Fix container padding */
+  .p-6 {
+    padding: 0.75rem !important;
+  }
+
+  .p-4 {
+    padding: 0.5rem !important;
+  }
+
+  /* Fix headers */
+  h1 {
+    font-size: 1.25rem !important;
+  }
+
+  h2 {
+    font-size: 1rem !important;
+  }
+
+  h3 {
+    font-size: 0.95rem !important;
+  }
+
+  /* Sidebar - very small on mobile */
+  aside {
+    width: 50px !important;
+    padding: 0.5rem !important;
+    gap: 1rem !important;
+  }
+
+  aside button {
+    padding: 0.5rem !important;
+  }
+
+  aside svg {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+
+  /* Main content - full width minus sidebar */
+  main {
+    width: calc(100vw - 50px) !important;
+  }
+
+  /* Fix System Status card */
+  .border-2.border-\[\#A1F1FA\] {
+    padding: 0.75rem !important;
+  }
+
+  .border-2.border-\[\#A1F1FA\] > div {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  .border-2.border-\[\#A1F1FA\] .flex.gap-4 {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+  }
+
+  .border-2.border-\[\#A1F1FA\] .bg-gray-800 {
+    width: 100% !important;
+  }
+
+  /* Sensor cards - 2 columns */
+  .grid.grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .grid.grid-cols-4 > div {
+    padding: 0.5rem !important;
+  }
+
+  .grid.grid-cols-4 svg {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+  }
+
+  .grid.grid-cols-4 .text-lg {
+    font-size: 1rem !important;
+  }
+
+  .grid.grid-cols-4 .text-sm {
+    font-size: 0.75rem !important;
+  }
+
+  /* Control buttons - stack vertically */
+  .grid.grid-cols-3 {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .grid.grid-cols-3 button {
+    padding: 0.75rem 0.5rem !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Charts container */
+  .h-64 {
+    height: 200px !important;
+  }
+
+  .h-\[200px\] {
+    height: 180px !important;
+  }
+
+  /* ✅ FIX: Increase Realtime Monitor CONTAINER height to prevent overlap */
+  /* This targets the parent container of the Realtime Monitor chart */
+  .bg-gray-800.p-4.rounded-lg.shadow-md.mb-6:has(.h-\[200px\]) {
+    min-height: 280px !important;
+    padding-bottom: 1rem !important;
+  }
+
+  /* Analytics section */
+  .grid.grid-cols-3.gap-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .grid.grid-cols-2.gap-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Analytics cards */
+  .bg-gray-800.p-4 {
+    padding: 0.75rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.25rem !important;
+  }
+
+  .text-xl {
+    font-size: 1.1rem !important;
+  }
+
+  /* Filter controls */
+  .flex.gap-4.items-center.bg-gray-700 {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .flex.gap-4.items-center.bg-gray-700 select {
+    width: 100% !important;
+  }
+
+  .flex.gap-4.items-center.bg-gray-700 .ml-auto {
+    margin-left: 0 !important;
+  }
+
+  /* Records page - pig cards */
+  .grid.grid-cols-3.gap-6 {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Reports page cards */
+  .max-w-4xl {
+    max-width: 95vw !important;
+  }
+
+  /* Header fixes */
+  header {
+    padding: 0.75rem !important;
+  }
+
+  header h1 {
+    font-size: 1.1rem !important;
+  }
+
+  header .flex.items-center.gap-4 {
+    gap: 0.5rem !important;
+  }
+
+  /* Hide username text on mobile */
+  header .text-sm {
+    display: none !important;
+  }
+
+  /* Profile picture smaller */
+  header .w-8.h-8 {
+    width: 2rem !important;
+    height: 2rem !important;
+  }
+
+  /* Notification panel */
+  .w-80 {
+    width: 85vw !important;
+    max-width: 300px !important;
+  }
+
+  /* Modal adjustments */
+  .fixed.inset-0 > div {
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+  }
+
+  /* Button text smaller */
+  button {
+    font-size: 0.875rem !important;
+  }
+
+  /* Alert banner */
+  .bg-red-600.p-4 {
+    padding: 0.75rem !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Today's Analytics title */
+  .text-\[\#A1F1FA\].mb-4 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Chart legends smaller */
+  canvas {
+    font-size: 10px !important;
+  }
+
+  /* Manual Control Panel */
+  .bg-gray-700.p-6.rounded-lg.shadow-md.mb-6 {
+    padding: 0.75rem !important;
+  }
+
+  /* Status badges */
+  .px-4.py-2.rounded-lg {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+}
+
+/* Extra small phones (320px - 480px) */
+@media (max-width: 480px) {
+  body {
+    font-size: 12px;
+  }
+
+  h1 {
+    font-size: 1.1rem !important;
+  }
+
+  h2 {
+    font-size: 0.95rem !important;
+  }
+
+  h3 {
+    font-size: 0.875rem !important;
+  }
+
+  /* Even smaller sidebar */
+  aside {
+    width: 45px !important;
+    padding: 0.25rem !important;
+  }
+
+  aside button {
+    padding: 0.4rem !important;
+  }
+
+  aside svg {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+  }
+
+  /* Main content adjust */
+  main {
+    width: calc(100vw - 45px) !important;
+  }
+
+  /* All grid items single column */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Smaller text everywhere */
+  .text-lg {
+    font-size: 0.95rem !important;
+  }
+
+  .text-sm {
+    font-size: 0.7rem !important;
+  }
+
+  .text-xs {
+    font-size: 0.65rem !important;
+  }
+
+  /* Smaller buttons */
+  button {
+    font-size: 0.75rem !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Smaller icons */
+  svg {
+    width: 1rem !important;
+    height: 1rem !important;
+  }
+
+  /* Charts even shorter */
+  .h-64 {
+    height: 160px !important;
+  }
+
+  /* ✅ FIX: Realtime Monitor container height for small phones */
+  .bg-gray-800.p-4.rounded-lg.shadow-md.mb-6:has(.h-\[200px\]) {
+    min-height: 250px !important;
+  }
+}
+
+/* Landscape orientation */
+@media (max-width: 896px) and (orientation: landscape) {
+  /* Reduce vertical spacing */
+  .mb-6 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .p-6 {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Shorter charts in landscape */
+  .h-64 {
+    height: 140px !important;
+  }
+
+  /* Compact cards */
+  .gap-4 {
+    gap: 0.5rem !important;
+  }
+
+  /* ✅ FIX: Realtime Monitor container in landscape */
+  .bg-gray-800.p-4.rounded-lg.shadow-md.mb-6:has(.h-\[200px\]) {
+    min-height: 200px !important;
+  }
+}
+
+/* Fix scrollbar visibility */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #4b5563 !important;
+  border-radius: 3px !important;
+}

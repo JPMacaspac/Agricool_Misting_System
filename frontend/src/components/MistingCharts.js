@@ -280,7 +280,7 @@ export default function MistingCharts({ logs }) {
         {/* Temperature & Humidity Chart */}
         <div className="bg-[#2B3848] p-4 rounded-lg shadow-md">
           <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">Temperature & Humidity Trends</h3>
-          <div className="h-48">
+          <div className="h-64 lg:h-80">
             <Line data={tempHumData} options={chartOptions} />
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function MistingCharts({ logs }) {
         {/* Duration Chart */}
         <div className="bg-[#2B3848] p-4 rounded-lg shadow-md">
           <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">Total Runtime per Day</h3>
-          <div className="h-48">
+          <div className="h-56 lg:h-72">
             <Bar data={durationData} options={chartOptions} />
           </div>
         </div>
@@ -296,7 +296,7 @@ export default function MistingCharts({ logs }) {
         {/* Event Count Chart */}
         <div className="bg-[#2B3848] p-4 rounded-lg shadow-md lg:col-span-2">
           <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">Misting Events per Day</h3>
-          <div className="h-48">
+          <div className="h-56 lg:h-72">
             <Bar data={eventCountData} options={chartOptions} />
           </div>
         </div>
@@ -304,7 +304,7 @@ export default function MistingCharts({ logs }) {
         {/* E. Microclimate Analysis */}
         <div className="bg-[#2B3848] p-4 rounded-lg shadow-md lg:col-span-2">
           <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">⭐ Microclimate Analysis (Temperature & Humidity)</h3>
-          <div className="h-64">
+          <div className="h-72 lg:h-[28rem]">
             <Line data={microclimateData} options={microclimateOptions} />
           </div>
           <p className="text-xs text-gray-400 mt-2">Shows daily temperature and humidity patterns</p>
@@ -313,7 +313,7 @@ export default function MistingCharts({ logs }) {
         {/* F. Before & After Comparison */}
         <div className="bg-[#2B3848] p-4 rounded-lg shadow-md lg:col-span-2">
           <h3 className="text-sm font-semibold text-[#A1F1FA] mb-2">⭐ Before & After Misting Comparison</h3>
-          <div className="h-64">
+          <div className="h-72 lg:h-[28rem]">
             <Bar data={beforeAfterData} options={chartOptions} />
           </div>
           <p className="text-xs text-gray-400 mt-2">Compares average temperature before and after misting activation</p>

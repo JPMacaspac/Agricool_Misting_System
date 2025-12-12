@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import bg from '../bg.jpg';
 import logo from '../logo.svg';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,7 +18,7 @@ export default function SignupPage() {
     e.preventDefault();
     try {
       // ✅ FIXED: Added /api prefix
-      const res = await axios.post("http://localhost:8081/api/signup", { name, email, password });
+      const res = await axios.post(`${API_BASE}/api/signup`, { name, email, password });
       
       if (res.data && res.data.user) {
         alert("Account created successfully!");

@@ -12,17 +12,39 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { FaCalendarAlt, FaDownload, FaPrint, FaChartLine, FaThermometerHalf, FaTint, FaClock, FaArrowLeft } from 'react-icons/fa';
+import { 
+  FaCalendarAlt, 
+  FaDownload, 
+  FaPrint, 
+  FaChartLine, 
+  FaThermometerHalf, 
+  FaTint, 
+  FaClock, 
+  FaChartBar,
+  FaRegCalendarAlt,
+  FaClipboardList,
+  FaFileAlt,
+  FaBars,
+  FaChevronUp,
+  FaChevronDown,
+} from 'react-icons/fa';
+import NotificationPanel from './NotificationPanel';
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, ArcElement, Tooltip, Legend, Filler);
 
 export default function Reports({ apiBase }) {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [bottomNavOpen, setBottomNavOpen] = useState(true);
   const [logs, setLogs] = useState([]);
   const [reportType, setReportType] = useState('daily');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  
+  const userName = localStorage.getItem("userName") || "Marc Andrei Toledo";
+  const profilePicture = localStorage.getItem("profilePicture") || "";
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -365,56 +387,143 @@ End of Report
   };
 
   return (
-    <div className="bg-gray-800 h-screen text-white font-sans flex flex-col overflow-hidden">
+    <div className="bg-gray-800 min-h-screen text-white font-sans flex flex-col">
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #1f2937;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #4b5563;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #6b7280;
+        }
+      `}</style>
+
       {/* Fixed Header */}
-      <header className="flex justify-between items-center p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-20">
-        <div className="flex items-center gap-4">
+      <header className="flex justify-between items-center p-3 sm:p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-20">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hidden md:block p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
           >
-            <FaArrowLeft /> Back
+            <FaBars className="text-xl text-[#A1F1FA]" />
           </button>
-          <div className="flex items-center gap-3">
-            <FaChartLine className="text-3xl text-[#A1F1FA]" />
-            <h1 className="text-2xl font-bold text-white">Misting System Reports</h1>
+          <div className="flex items-center gap-2">
+            <FaChartLine className="text-xl sm:text-2xl text-[#A1F1FA]" />
+            <h1 className="text-base sm:text-xl md:text-2xl font-bold text-white">Misting System Reports</h1>
           </div>
         </div>
-        <div className="flex gap-3">
+
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+            className="flex items-center gap-1 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-2 rounded-lg transition text-xs sm:text-sm"
           >
-            <FaPrint className="text-white" /> Print
+            <FaPrint className="text-white" /> <span className="hidden sm:inline">Print</span>
           </button>
           <button
             onClick={handleDownload}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
+            className="flex items-center gap-1 sm:gap-2 bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-2 rounded-lg transition text-xs sm:text-sm"
           >
-            <FaDownload className="text-white" /> Download
+            <FaDownload className="text-white" /> <span className="hidden sm:inline">Download</span>
           </button>
+
+          <NotificationPanel apiBase={apiBase} />
+
+          <div className="relative">
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden border-2 border-gray-500">
+                {profilePicture ? (
+                  <img
+                    src={profilePicture}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      const span = document.createElement('span');
+                      span.className = 'text-sm font-semibold';
+                      span.textContent = userName[0];
+                      e.target.parentElement.appendChild(span);
+                    }}
+                  />
+                ) : (
+                  <span className="text-sm font-semibold">{userName[0]}</span>
+                )}
+              </div>
+              <span className="text-sm hidden lg:inline">{userName}</span>
+            </div>
+
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-gray-800 rounded-md shadow-lg p-2 z-10 border border-gray-700">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate('/profile');
+                  }}
+                  className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-sm text-white"
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.clear();
+                    window.location.href = "/";
+                  }}
+                  className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-red-400 text-sm"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* Scrollable Main Content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar">
-        <style>{`
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: #1f2937;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 4px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #6b7280;
-          }
-        `}</style>
+      {/* Main Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Sidebar */}
+        <aside className={`hidden md:flex bg-gray-900 flex-col items-center py-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0 transition-all duration-300 ${sidebarOpen ? 'w-24 px-4' : 'w-0 px-0 border-0 overflow-hidden'
+          }`}>
+          <button
+            className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
+            onClick={() => navigate('/dashboard')}
+          >
+            <FaChartBar className="text-2xl" />
+          </button>
+          <button
+            className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
+            onClick={() => navigate('/daily-logs')}
+          >
+            <FaRegCalendarAlt className="text-2xl" />
+          </button>
+          <button
+            className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
+            onClick={() => navigate('/records')}
+          >
+            <FaClipboardList className="text-2xl" />
+          </button>
+          <button
+            className="text-[#A1F1FA] bg-gray-800 p-4 rounded-lg border-2 border-[#A1F1FA] w-full flex items-center justify-center hover:bg-gray-700"
+            onClick={() => navigate('/reports')}
+          >
+            <FaFileAlt className="text-2xl" />
+          </button>
+        </aside>
 
-        <div className="p-6 space-y-6">
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto pb-4 md:pb-0 custom-scrollbar">
+          <div className="p-6 space-y-6">
           {/* Report Type Selector */}
           <div className="bg-gray-700 p-6 rounded-lg shadow-lg">
             <div className="flex gap-4 items-center flex-wrap">
@@ -449,13 +558,22 @@ End of Report
               {/* Date Selectors */}
               {reportType === 'daily' && (
                 <div className="relative">
-                  <FaCalendarAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white pointer-events-none" />
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-gray-800 text-gray-200 pl-10 pr-4 py-2 rounded-lg outline-none"
+                    className="bg-gray-800 text-gray-200 px-4 py-2 rounded-lg outline-none date-input-white"
+                    style={{
+                      colorScheme: 'dark'
+                    }}
                   />
+                  <style>{`
+                    .date-input-white::-webkit-calendar-picker-indicator {
+                      filter: invert(1) brightness(100);
+                      cursor: pointer;
+                      margin-left: 4px;
+                    }
+                  `}</style>
                 </div>
               )}
               {reportType === 'monthly' && (
@@ -546,22 +664,24 @@ End of Report
             {/* Event Distribution */}
             <div className="bg-gray-700 p-6 rounded-lg shadow-lg">
               <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Event Distribution</h3>
-              <div className="h-80 flex flex-col items-center justify-center">
+              <div className="flex flex-col items-center">
                 {stats.totalEvents > 0 && (stats.autoEvents > 0 || stats.manualEvents > 0) ? (
-                  <div className="w-full h-64 flex items-center justify-center">
+                  <div className="w-full max-w-xs h-64 flex items-center justify-center mb-4">
                     <Doughnut data={eventDistribution} options={doughnutOptions} />
                   </div>
                 ) : (
-                  <p className="text-gray-400">No event data available</p>
+                  <div className="h-64 flex items-center justify-center">
+                    <p className="text-gray-400">No event data available</p>
+                  </div>
                 )}
-                <div className="mt-4 grid grid-cols-2 gap-2 text-center text-sm w-full">
+                <div className="grid grid-cols-2 gap-3 text-center w-full">
                   <div className="bg-green-600/20 p-3 rounded border border-green-600">
                     <p className="text-green-400 font-bold text-2xl">{stats.autoEvents}</p>
-                    <p className="text-gray-300 font-semibold">Auto Events</p>
+                    <p className="text-gray-300 font-semibold text-sm">Auto Events</p>
                   </div>
                   <div className="bg-yellow-600/20 p-3 rounded border border-yellow-600">
                     <p className="text-yellow-400 font-bold text-2xl">{stats.manualEvents}</p>
-                    <p className="text-gray-300 font-semibold">Manual Events</p>
+                    <p className="text-gray-300 font-semibold text-sm">Manual Events</p>
                   </div>
                 </div>
               </div>
@@ -573,26 +693,28 @@ End of Report
             {/* Temperature Zones */}
             <div className="bg-gray-700 p-6 rounded-lg shadow-lg">
               <h3 className="text-lg font-semibold text-[#A1F1FA] mb-4">Temperature Safety Zones</h3>
-              <div className="h-80 flex flex-col items-center justify-center">
+              <div className="flex flex-col items-center">
                 {stats.totalEvents > 0 && (stats.safeEvents > 0 || stats.warningEvents > 0 || stats.dangerEvents > 0) ? (
-                  <div className="w-full h-64 flex items-center justify-center">
+                  <div className="w-full max-w-xs h-64 flex items-center justify-center mb-4">
                     <Doughnut data={tempZones} options={doughnutOptions} />
                   </div>
                 ) : (
-                  <p className="text-gray-400">No temperature data available</p>
+                  <div className="h-64 flex items-center justify-center">
+                    <p className="text-gray-400">No temperature data available</p>
+                  </div>
                 )}
-                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs w-full">
-                  <div className="bg-green-600/20 p-3 rounded border border-green-600">
-                    <p className="text-green-400 font-bold text-2xl">{stats.safeEvents}</p>
-                    <p className="text-gray-300 font-semibold text-sm">Safe</p>
+                <div className="grid grid-cols-3 gap-2 text-center w-full">
+                  <div className="bg-green-600/20 p-2 rounded border border-green-600">
+                    <p className="text-green-400 font-bold text-xl">{stats.safeEvents}</p>
+                    <p className="text-gray-300 font-semibold text-xs">Safe</p>
                   </div>
-                  <div className="bg-yellow-600/20 p-3 rounded border border-yellow-600">
-                    <p className="text-yellow-400 font-bold text-2xl">{stats.warningEvents}</p>
-                    <p className="text-gray-300 font-semibold text-sm">Warning</p>
+                  <div className="bg-yellow-600/20 p-2 rounded border border-yellow-600">
+                    <p className="text-yellow-400 font-bold text-xl">{stats.warningEvents}</p>
+                    <p className="text-gray-300 font-semibold text-xs">Warning</p>
                   </div>
-                  <div className="bg-red-600/20 p-3 rounded border border-red-600">
-                    <p className="text-red-400 font-bold text-2xl">{stats.dangerEvents}</p>
-                    <p className="text-gray-300 font-semibold text-sm">Danger</p>
+                  <div className="bg-red-600/20 p-2 rounded border border-red-600">
+                    <p className="text-red-400 font-bold text-xl">{stats.dangerEvents}</p>
+                    <p className="text-gray-300 font-semibold text-xs">Danger</p>
                   </div>
                 </div>
               </div>
@@ -665,6 +787,53 @@ End of Report
           )}
         </div>
       </main>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-[#A1F1FA] transition-transform duration-300 z-30 ${bottomNavOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}>
+        <button
+          onClick={() => setBottomNavOpen(!bottomNavOpen)}
+          className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 p-2 rounded-t-lg border-2 border-b-0 border-[#A1F1FA]"
+        >
+          {bottomNavOpen ? (
+            <FaChevronDown className="text-[#A1F1FA]" />
+          ) : (
+            <FaChevronUp className="text-[#A1F1FA]" />
+          )}
+        </button>
+
+        <div className="grid grid-cols-4 gap-2 p-3">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+          >
+            <FaChartBar className="text-xl" />
+            <span className="text-xs">Dashboard</span>
+          </button>
+          <button
+            onClick={() => navigate('/daily-logs')}
+            className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+          >
+            <FaRegCalendarAlt className="text-xl" />
+            <span className="text-xs">Daily Log</span>
+          </button>
+          <button
+            onClick={() => navigate('/records')}
+            className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+          >
+            <FaClipboardList className="text-xl" />
+            <span className="text-xs">Records</span>
+          </button>
+          <button
+            onClick={() => navigate('/reports')}
+            className="flex flex-col items-center gap-1 p-3 bg-gray-800 rounded-lg border-2 border-[#A1F1FA]"
+          >
+            <FaFileAlt className="text-xl text-[#A1F1FA]" />
+            <span className="text-xs text-[#A1F1FA]">Reports</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

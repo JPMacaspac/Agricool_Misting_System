@@ -17,21 +17,22 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private connectWithFallback() {
-    const primaryBroker = 'mqtt://agricool-mqtt:1883';
-    const fallbackBroker = 'mqtt://192.168.1.3:1883';
+private connectWithFallback() {
+  // ✅ Use environment variable for Railway deployment
+  const primaryBroker = process.env.MQTT_BROKER_URL || 'mqtt://mosquitto-broker.railway.internal:1883';
+  const fallbackBroker = 'mqtt://192.168.1.3:1883';
 
-    console.log('🔌 Initializing MQTT client...');
-    console.log(`🌐 Primary broker: ${primaryBroker}`);
-    console.log(`🌐 Fallback broker: ${fallbackBroker}`);
+  console.log('🔌 Initializing MQTT client...');
+  console.log(`🌐 Primary broker: ${primaryBroker}`);
+  console.log(`🌐 Fallback broker: ${fallbackBroker}`);
 
-    // Try primary broker first
-    this.client = mqtt.connect(primaryBroker, {
-      clientId: 'agricool-backend',
-      clean: true,
-      reconnectPeriod: 5000,
-      connectTimeout: 10000,
-    });
+  // Try primary broker first
+  this.client = mqtt.connect(primaryBroker, {
+    clientId: 'agricool-backend',
+    clean: true,
+    reconnectPeriod: 5000,
+    connectTimeout: 10000,
+  });
 
     // Set a timeout to try fallback if primary fails
     const fallbackTimeout = setTimeout(() => {

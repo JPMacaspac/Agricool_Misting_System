@@ -11,13 +11,18 @@ import {
   FaSync,
   FaThermometerHalf,
   FaFileAlt,
+  FaBars,
+  FaChevronUp,
+  FaChevronDown,
 } from 'react-icons/fa';
 
-const API_URL = 'http://localhost:8081/api/thermal';
-const API_BASE = 'http://localhost:8081';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+const API_URL = `${API_BASE}/api/thermal`;
 
 export default function Records() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [bottomNavOpen, setBottomNavOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -27,7 +32,7 @@ export default function Records() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const recordsPerPage = 15;
+  const recordsPerPage = 5;
 
   const userName = localStorage.getItem("userName") || "Marc Andrei Toledo";
   const profilePicture = localStorage.getItem("profilePicture") || "";
@@ -126,7 +131,7 @@ export default function Records() {
   }, [pigRecords, currentPage]);
 
   return (
-    <div className="bg-gray-800 h-screen text-white font-sans flex flex-col overflow-hidden">
+    <div className="bg-gray-800 min-h-screen text-white font-sans flex flex-col">
       {/* Custom Scrollbar Styles */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
@@ -145,43 +150,65 @@ export default function Records() {
       `}</style>
 
       {/* Fixed Header */}
-      <header className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-30">
-        <h1 className="text-xl font-bold">AgriCool</h1>
-
+      <header className="flex justify-between items-center p-3 sm:p-4 bg-gray-900 shadow-md border-b-2 border-[#A1F1FA] z-20">
         <div className="flex items-center gap-4">
-          {/* Notification Panel - THIS WAS MISSING! */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hidden md:block p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+          >
+            <FaBars className="text-xl text-[#A1F1FA]" />
+          </button>
+          <h1 className="text-xl sm:text-2xl font-bold">AgriCool</h1>
+        </div>
+
+        <div className="flex items-center gap-3 sm:gap-4">
           <NotificationPanel apiBase={API_BASE} />
 
-          {/* User Menu */}
           <div className="relative">
             <div
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => setMenuOpen(!menuOpen)}
             >
-              <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden border-2 border-gray-500">
                 {profilePicture ? (
-                  <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                  <img
+                    src={profilePicture}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      const span = document.createElement('span');
+                      span.className = 'text-sm font-semibold';
+                      span.textContent = userName[0];
+                      e.target.parentElement.appendChild(span);
+                    }}
+                  />
                 ) : (
-                  <span className="text-xs">{userName[0]}</span>
+                  <span className="text-sm font-semibold">{userName[0]}</span>
                 )}
               </div>
-              <span className="text-sm">{userName}</span>
+              <span className="text-sm hidden sm:inline">{userName}</span>
             </div>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-gray-800 rounded-md shadow-lg p-2 z-10">
+              <div className="absolute right-0 mt-2 w-40 bg-gray-800 rounded-md shadow-lg p-2 z-10 border border-gray-700">
                 <button
-                  onClick={() => navigate('/profile')}
-                  className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate('/profile');
+                  }}
+                  className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-sm"
                 >
                   Profile
                 </button>
                 <button
                   onClick={() => {
                     localStorage.clear();
-                    navigate('/');
+                    window.location.href = "/";
                   }}
-                  className="block w-full text-left px-3 py-1 hover:bg-gray-700 rounded text-red-400"
+                  className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-red-400 text-sm"
                 >
                   Logout
                 </button>
@@ -191,48 +218,39 @@ export default function Records() {
         </div>
       </header>
 
-      {/* Sidebar + Main Content */}
-      <div className="flex flex-1 pt-16 overflow-hidden">
-        {/* Fixed Sidebar */}
-        <aside className="fixed left-0 top-16 bottom-0 bg-gray-900 w-20 flex flex-col items-center p-4 gap-6 border-r-2 border-[#A1F1FA] z-20">
+      {/* Main Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Sidebar */}
+        <aside className={`hidden md:flex bg-gray-900 flex-col items-center py-4 gap-6 border-r-2 border-[#A1F1FA] flex-shrink-0 transition-all duration-300 ${sidebarOpen ? 'w-24 px-4' : 'w-0 px-0 border-0 overflow-hidden'
+          }`}>
           <button
-            className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
-            title="Dashboard"
+            className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
             onClick={() => navigate('/dashboard')}
           >
             <FaChartBar className="text-2xl" />
           </button>
-
           <button
-            className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
-            title="Daily Log"
+            className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
             onClick={() => navigate('/daily-logs')}
           >
             <FaRegCalendarAlt className="text-2xl" />
           </button>
-
           <button
-            className="text-[#A1F1FA] transition duration-200 bg-gray-800 p-3 rounded-lg border-2 border-[#A1F1FA]"
-            title="Records"
+            className="text-[#A1F1FA] bg-gray-800 p-4 rounded-lg border-2 border-[#A1F1FA] w-full flex items-center justify-center hover:bg-gray-700"
+            onClick={() => navigate('/records')}
           >
             <FaClipboardList className="text-2xl" />
           </button>
-
           <button
-            className="hover:text-[#A1F1FA] transition duration-200 p-3 rounded-lg hover:bg-gray-800"
-            title="Reports"
+            className="hover:text-[#A1F1FA] p-4 rounded-lg hover:bg-gray-800 w-full flex items-center justify-center"
             onClick={() => navigate('/reports')}
           >
             <FaFileAlt className="text-2xl" />
           </button>
-
-          <div className="flex-1"></div>
-
-          <div className="w-6 h-6 bg-gray-600 rounded-md"></div>
         </aside>
 
-        {/* Main Content with Scrollbar */}
-        <main className="flex-1 ml-20 overflow-y-auto custom-scrollbar">
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto pb-4 md:pb-0 custom-scrollbar">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-[#A1F1FA]">🌡️ Live Thermal Monitoring</h2>
@@ -519,6 +537,52 @@ export default function Records() {
           </div>
         </div>
       )}
+
+      {/* Mobile Bottom Navigation */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-[#A1F1FA] transition-transform duration-300 z-30 ${bottomNavOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}>
+        <button
+          onClick={() => setBottomNavOpen(!bottomNavOpen)}
+          className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 p-2 rounded-t-lg border-2 border-b-0 border-[#A1F1FA]"
+        >
+          {bottomNavOpen ? (
+            <FaChevronDown className="text-[#A1F1FA]" />
+          ) : (
+            <FaChevronUp className="text-[#A1F1FA]" />
+          )}
+        </button>
+
+        <div className="grid grid-cols-4 gap-2 p-3">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+          >
+            <FaChartBar className="text-xl" />
+            <span className="text-xs">Dashboard</span>
+          </button>
+          <button
+            onClick={() => navigate('/daily-logs')}
+            className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+          >
+            <FaRegCalendarAlt className="text-xl" />
+            <span className="text-xs">Daily Log</span>
+          </button>
+          <button
+            onClick={() => navigate('/records')}
+            className="flex flex-col items-center gap-1 p-3 bg-gray-800 rounded-lg border-2 border-[#A1F1FA]"
+          >
+            <FaClipboardList className="text-xl text-[#A1F1FA]" />
+            <span className="text-xs text-[#A1F1FA]">Records</span>
+          </button>
+          <button
+            onClick={() => navigate('/reports')}
+            className="flex flex-col items-center gap-1 p-3 hover:bg-gray-800 rounded-lg"
+          >
+            <FaFileAlt className="text-xl" />
+            <span className="text-xs">Reports</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
