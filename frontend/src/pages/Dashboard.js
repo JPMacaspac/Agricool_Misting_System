@@ -345,12 +345,12 @@ function SystemStatus({ sensorData, pumpMode }) {
             </p>
           </div>
         </div>
-        
+
         <div className="bg-gray-800 px-4 py-2 rounded-lg">
           <p className="text-xs text-gray-400 mb-1">Mode</p>
           <p className="font-bold text-[#A1F1FA] text-sm">{pumpMode.toUpperCase()}</p>
         </div>
-        
+
         <div className="bg-gray-800 px-4 py-2 rounded-lg">
           <p className="text-xs text-gray-400 mb-1">Pump</p>
           <p className={`font-bold text-sm ${sensorData?.pumpStatus ? 'text-green-400' : 'text-red-400'}`}>
@@ -593,24 +593,26 @@ export default function Dashboard() {
             </div>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-40 bg-gray-800 rounded-md shadow-lg p-2 z-10 border border-gray-700">
+              <div className="absolute right-0 top-11 w-30 bg-gray-800 rounded-md shadow-xl p-3 z-50 border-2 border-[#A1F1FA]">
                 <button
                   onClick={() => {
                     setMenuOpen(false);
                     navigate('/profile');
                   }}
-                  className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-sm"
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 hover:bg-gray-700 rounded text-base font-medium transition-colors"
                 >
-                  Profile
+                  <span>👤</span>
+                  <span>Profile</span>
                 </button>
                 <button
                   onClick={() => {
                     localStorage.clear();
                     window.location.href = "/";
                   }}
-                  className="block w-full text-left px-3 py-2 hover:bg-gray-700 rounded text-red-400 text-sm"
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 hover:bg-gray-700 rounded text-red-400 text-base font-medium mt-2 transition-colors"
                 >
-                  Logout
+                  <span>🚪</span>
+                  <span>Logout</span>
                 </button>
               </div>
             )}

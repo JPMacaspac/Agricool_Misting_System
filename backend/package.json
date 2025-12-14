@@ -27,6 +27,7 @@
     "@nestjs/platform-socket.io": "^11.1.9",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.9",
+    "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "bonjour": "^3.5.0",
     "mqtt": "^5.14.1",
