@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sensor } from './sensors.entity';
 import { MistingLog } from '../misting/misting-log.entity';
+import { TelegramService } from '../notifications/telegram.service';
 import sseEmitter from '../sse';
 
 interface MistingStartData {
@@ -22,23 +23,80 @@ interface MistingEndData {
 
 @Injectable()
 export class SensorsService {
+  private readonly HIGH_TEMP_THRESHOLD = 35;
+  private readonly LOW_WATER_THRESHOLD = 30;
+  private lastLowWaterAlert = 0;
+
   constructor(
     @InjectRepository(Sensor)
     private sensorsRepository: Repository<Sensor>,
     @InjectRepository(MistingLog)
     private mistingLogRepository: Repository<MistingLog>,
+    private telegramService: TelegramService,
   ) {}
 
   async create(data: Partial<Sensor>) {
     const newData = this.sensorsRepository.create(data);
     const saved = await this.sensorsRepository.save(newData);
+    
     // emit to SSE listeners (best-effort)
     try {
       sseEmitter.emit('data', saved);
     } catch (e) {
       // ignore
     }
+
+    // ✅ Send Telegram alerts (non-blocking, async)
+    this.checkAndSendAlerts(saved);
+    
     return saved;
+  }
+
+  /**
+   * Calculate heat index from temperature and humidity
+   */
+  private calculateHeatIndex(temp: number, humidity: number): number {
+    if (humidity > 40) {
+      return temp + (0.5 * (temp - 14.5) * (humidity / 100.0));
+    }
+    return temp;
+  }
+
+  /**
+   * Check conditions and send Telegram alerts (non-blocking)
+   */
+  private async checkAndSendAlerts(sensor: Sensor) {
+    try {
+      const heatIndex = this.calculateHeatIndex(sensor.temperature, sensor.humidity);
+
+      // High temperature alert
+      if (sensor.temperature >= this.HIGH_TEMP_THRESHOLD && sensor.pumpStatus) {
+        await this.telegramService.sendHighTempAlert({
+          temperature: sensor.temperature,
+          humidity: sensor.humidity,
+          heatIndex: heatIndex,
+          waterLevel: sensor.waterLevel,
+          pumpStatus: sensor.pumpStatus,
+        });
+      }
+
+      // Low water alert (with cooldown)
+      const now = Date.now();
+      if (
+        sensor.waterLevel <= this.LOW_WATER_THRESHOLD &&
+        now - this.lastLowWaterAlert > 30 * 60 * 1000 // 30 minutes cooldown
+      ) {
+        await this.telegramService.sendLowWaterAlert({
+          waterLevel: sensor.waterLevel,
+          temperature: sensor.temperature,
+          pumpStatus: sensor.pumpStatus,
+        });
+        this.lastLowWaterAlert = now;
+      }
+    } catch (error) {
+      // Don't let alert failures affect sensor data saving
+      console.error('Telegram alert error (non-critical):', error);
+    }
   }
 
   findAll() {
@@ -73,6 +131,15 @@ export class SensorsService {
       mistingType: data.mistingType || 'AUTO',
     });
     const saved = await this.mistingLogRepository.save(newLog);
+
+    // ✅ Send Telegram notification (non-blocking)
+    this.telegramService.sendMistingStarted({
+      mistingType: (data.mistingType || 'AUTO') as 'AUTO' | 'MANUAL',
+      temperature: data.temperature,
+      humidity: data.humidity,
+      waterLevel: data.waterLevel,
+    }).catch(err => console.error('Telegram misting alert error:', err));
+
     return { success: true, logId: saved.id };
   }
 
