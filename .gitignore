@@ -19,6 +19,8 @@ backend/node_modules/
 # ==================================================
 /build
 /dist
+frontend/build/
+backend/dist/
 
 # ==================================================
 # CACHE AND TEMP FILES
